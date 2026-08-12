@@ -35,6 +35,7 @@ html {
 
 body {
   min-height: 100dvh;
+  width: 100%;
 }
 
 body::before {
@@ -165,6 +166,7 @@ button {
   height: 100%;
   display: block;
   background: #8fd7ff;
+  object-fit: contain;
 }
 
 .overlay-screen {
@@ -1179,8 +1181,40 @@ kbd {
 }
 
 @media (max-width: 650px) {
+  html,
+  body {
+    width: 100%;
+    min-height: 100dvh;
+    overflow: hidden;
+  }
+
+  body::before,
+  .frame-glow,
+  .page-note {
+    display: none;
+  }
+
+  .page-shell {
+    width: 100dvw;
+    min-height: 100dvh;
+    padding: env(safe-area-inset-top) 0 env(safe-area-inset-bottom);
+    display: block;
+  }
+
+  .game-frame {
+    width: 100dvw;
+    height: calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: #120f1b;
+    box-shadow: none;
+  }
+
   .game-topbar {
-    height: 44px;
+    height: 42px;
+    padding: 6px 10px;
+    background: rgba(18,15,27,.96);
   }
 
   .mini-brand {
@@ -1188,28 +1222,86 @@ kbd {
   }
 
   .mini-brand__slice {
-    width: 29px;
-    height: 29px;
+    width: 28px;
+    height: 28px;
+    border-radius: 9px;
+  }
+
+  .icon-button {
+    width: 32px;
+    height: 32px;
+    border-radius: 10px;
+  }
+
+  .canvas-wrap {
+    width: 100dvw;
+    height: calc(100dvh - 42px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+    max-height: none;
+    aspect-ratio: auto;
+    border-radius: 0;
+    display: grid;
+    place-items: center;
+  }
+
+  #gameCanvas {
+    width: 100%;
+    height: auto;
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+    background: #16111f;
   }
 
   .overlay-screen {
-    padding: 14px;
+    padding: 10px;
+    overflow: hidden;
+  }
+
+  .overlay-screen--menu {
+    place-items: center;
+    background:
+      linear-gradient(180deg, rgba(38,19,48,.9), rgba(38,19,48,.72)),
+      radial-gradient(circle at 50% 34%, rgba(255,202,74,.25), transparent 36%);
+  }
+
+  .menu-hero {
+    width: min(100%, 390px);
+    max-width: 390px;
+    padding: 0 8px;
+    align-self: center;
+  }
+
+  .eyebrow {
+    font-size: 10px;
+    letter-spacing: 1.4px;
+    white-space: normal;
   }
 
   .logo-title {
-    font-size: clamp(44px, 17vw, 56px);
+    font-size: clamp(34px, 16vw, 62px);
+    line-height: .84;
     letter-spacing: 0;
+    max-width: 100%;
+    overflow-wrap: anywhere;
+    filter: drop-shadow(0 5px 0 rgba(61,18,33,.32));
+  }
+
+  .logo-title__pizza,
+  .logo-title__dash {
+    -webkit-text-stroke-width: 2px;
   }
 
   .menu-copy {
-    margin: 23px 0 18px;
-    font-size: 14px;
+    max-width: 34ch;
+    margin: 14px auto 14px;
+    font-size: clamp(13px, 4vw, 16px);
+    line-height: 1.38;
   }
 
   .primary-button,
   .secondary-button {
-    min-height: 44px;
-    padding: 0 18px;
+    min-height: 42px;
+    padding: 0 14px;
     font-size: 14px;
   }
 
@@ -1218,6 +1310,8 @@ kbd {
   }
 
   .panel {
+    width: min(94dvw, 420px);
+    max-height: calc(100dvh - 76px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
     padding: 20px;
     border-radius: 20px;
   }
@@ -1240,6 +1334,16 @@ kbd {
     flex-wrap: wrap;
   }
 
+  .hud {
+    inset: 6px 6px auto;
+  }
+
+  .hud-pill {
+    min-height: 34px;
+    padding: 4px 7px;
+    border-width: 1px;
+  }
+
   .hud-pill strong {
     font-size: 13px;
   }
@@ -1250,6 +1354,12 @@ kbd {
 
   .mission-card > span {
     font-size: 12px;
+  }
+
+  .mobile-controls {
+    left: 10px;
+    right: 10px;
+    bottom: max(10px, env(safe-area-inset-bottom));
   }
 
   .dpad {
@@ -1272,5 +1382,20 @@ kbd {
     width: 66px;
     height: 66px;
     font-size: 24px;
+  }
+}
+
+@media (max-width: 650px) and (orientation: landscape) {
+  #gameCanvas {
+    width: auto;
+    height: 100%;
+  }
+
+  .overlay-screen {
+    padding: 8px;
+  }
+
+  .logo-title {
+    font-size: clamp(34px, 12vw, 62px);
   }
 }

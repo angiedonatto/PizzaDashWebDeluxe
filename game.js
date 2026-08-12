@@ -31,7 +31,9 @@
     resultTime: document.getElementById("resultTime"),
     resultScore: document.getElementById("resultScore"),
     resultDeliveries: document.getElementById("resultDeliveries"),
-    nextBtn: document.getElementById("nextBtn")
+    nextBtn: document.getElementById("nextBtn"),
+    retryBtn: document.getElementById("retryBtn"),
+    resultMenuBtn: document.getElementById("resultMenuBtn")
   };
 
   const LEVELS = [
@@ -94,6 +96,10 @@
   let rainOffset = 0;
   let ambientTick = 0;
   let animationClock = 0;
+  let deliveryCombo = 0;
+  let lastDeliveryAt = 0;
+  let autoAdvanceTimer = 0;
+  let levelIntroTimer = 0;
   const particles = [];
   const floatTexts = [];
 
@@ -132,6 +138,14 @@
     const dx = circle.x - closestX;
     const dy = circle.y - closestY;
     return dx * dx + dy * dy < circle.r * circle.r;
+  }
+
+  function pointInRect(x, y, rect, pad = 0) {
+    return x >= rect.x - pad && x <= rect.x + rect.w + pad && y >= rect.y - pad && y <= rect.y + rect.h + pad;
+  }
+
+  function isOnRoad(x, y, pad = 0) {
+    return world && world.roads.some(road => pointInRect(x, y, road, pad));
   }
 
   function getAudioContext() {
@@ -186,6 +200,7 @@
   }
 
   function openMenu() {
+    clearTimeout(autoAdvanceTimer);
     state = "menu";
     showOnly(el.menu);
     el.hud.classList.add("hidden");
@@ -195,6 +210,7 @@
   }
 
   function openLevelSelect() {
+    clearTimeout(autoAdvanceTimer);
     state = "levelSelect";
     showOnly(el.level);
     el.hud.classList.add("hidden");
@@ -309,20 +325,7 @@
       );
     }
 
-    const trafficMultiplier = levelIndex === 0 ? 1 : levelIndex === 1 ? 1.12 : 1.34;
-    const cars = [
-      makeCar(-100, 320, 92, 48, 1, 0, "#e75245", levelData.traffic * trafficMultiplier),
-      makeCar(510, 368, 88, 46, -1, 0, "#477ec2", levelData.traffic * .92 * trafficMultiplier),
-      makeCar(588, -90, 48, 92, 0, 1, "#f2b640", levelData.traffic * .82 * trafficMultiplier),
-      makeCar(635, 750, 48, 92, 0, -1, "#7b55b7", levelData.traffic * .9 * trafficMultiplier)
-    ];
-
-    if (levelIndex >= 1) {
-      cars.push(makeCar(1340, 318, 92, 48, -1, 0, "#48a56a", levelData.traffic * 1.08));
-    }
-    if (levelIndex === 2) {
-      cars.push(makeCar(585, 810, 48, 92, 0, -1, "#e57a3c", levelData.traffic * 1.12));
-    }
+    const cars = createTraffic(roads, levelIndex);
 
     const coins = [
       { x: 330, y: 245, taken: false, phase: rand(0, 6.2) },
@@ -342,15 +345,76 @@
       if (!inRoad && !inHouse) flowerSeed.push({ x, y, c: Math.floor(rand(0, 4)) });
     }
 
-    return { roads, houses, obstacles, trees, benches, puddles, cats, cars, coins, flowerSeed };
+    const crosswalks = createCrosswalks(roads);
+
+    return { roads, houses, obstacles, trees, benches, puddles, cats, cars, coins, flowerSeed, crosswalks };
   }
 
   function makeHouse(x, y, w, h, wall, roof, doorX, doorY) {
     return { x, y, w, h, wall, roof, doorX, doorY, night: false };
   }
 
-  function makeCar(x, y, w, h, dx, dy, color, speed) {
-    return { x, y, w, h, dx, dy, color, speed, hornCooldown: rand(1.5, 4) };
+  function makeCar(x, y, w, h, dx, dy, color, speed, lane) {
+    return { x, y, w, h, dx, dy, color, speed, lane, hornCooldown: rand(1.5, 4) };
+  }
+
+  function createTraffic(roads, levelIndex) {
+    const colors = ["#e75245", "#477ec2", "#f2b640", "#7b55b7", "#48a56a", "#e57a3c", "#40a9a8"];
+    const multiplier = levelIndex === 0 ? 1 : levelIndex === 1 ? 1.08 : 1.28;
+    const cars = [];
+    let colorIndex = 0;
+
+    for (const road of roads) {
+      if (road.axis === "x") {
+        const laneGap = road.h / 4;
+        [-1, 1].forEach((direction, laneIndex) => {
+          cars.push(makeCar(
+            direction > 0 ? -160 - laneIndex * 310 : W + 160 + laneIndex * 280,
+            road.y + laneGap * (laneIndex + 1) - 24,
+            92,
+            48,
+            direction,
+            0,
+            colors[colorIndex++ % colors.length],
+            levelData.traffic * multiplier * (laneIndex ? .92 : 1),
+            { axis: "x", road }
+          ));
+        });
+        if (levelIndex >= 1) {
+          cars.push(makeCar(W + 520, road.y + laneGap * 3 - 24, 92, 48, -1, 0, colors[colorIndex++ % colors.length], levelData.traffic * multiplier * 1.06, { axis: "x", road }));
+        }
+      } else {
+        const laneGap = road.w / 4;
+        [-1, 1].forEach((direction, laneIndex) => {
+          cars.push(makeCar(
+            road.x + laneGap * (laneIndex + 1) - 24,
+            direction > 0 ? -170 - laneIndex * 260 : H + 170 + laneIndex * 300,
+            48,
+            92,
+            0,
+            direction,
+            colors[colorIndex++ % colors.length],
+            levelData.traffic * multiplier * (laneIndex ? .86 : .96),
+            { axis: "y", road }
+          ));
+        });
+        if (levelIndex === 2) {
+          cars.push(makeCar(road.x + laneGap * 3 - 24, H + 570, 48, 92, 0, -1, colors[colorIndex++ % colors.length], levelData.traffic * multiplier * 1.08, { axis: "y", road }));
+        }
+      }
+    }
+
+    return cars;
+  }
+
+  function createCrosswalks(roads) {
+    const horizontal = roads.find(road => road.axis === "x");
+    const vertical = roads.find(road => road.axis === "y");
+    if (!horizontal || !vertical) return [];
+    return [
+      { x: vertical.x, y: horizontal.y - 10, w: vertical.w, h: 14, horizontal: true },
+      { x: vertical.x - 13, y: horizontal.y + horizontal.h, w: 14, h: 78, horizontal: false }
+    ];
   }
 
   function makeCat(x, y, range, axis) {
@@ -363,6 +427,7 @@
   }
 
   function beginLevel(index) {
+    clearTimeout(autoAdvanceTimer);
     activeLevel = index;
     levelData = LEVELS[index];
     world = buildWorld(index);
@@ -374,7 +439,9 @@
       facing: "right",
       moving: false,
       hasPizza: true,
-      bump: 0
+      bump: 0,
+      celebrate: 0,
+      trailTimer: 0
     };
     timeLeft = levelData.duration;
     delivered = 0;
@@ -383,9 +450,12 @@
     currentTarget = 0;
     invulnerable = 0;
     actionCooldown = 0;
+    deliveryCombo = 0;
+    lastDeliveryAt = 0;
     particles.length = 0;
     floatTexts.length = 0;
     state = "playing";
+    levelIntroTimer = 2.2;
     showOnly(null);
     el.hud.classList.remove("hidden");
     el.pauseBtn.classList.remove("hidden");
@@ -415,6 +485,22 @@
     }
   }
 
+  function keepPlayerSafe() {
+    player.x = clamp(player.x, player.r + 8, W - player.r - 8);
+    player.y = clamp(player.y, player.r + 62, H - player.r - 8);
+    for (let i = 0; i < 10; i++) {
+      const obstacle = world.obstacles.find(o => circleRectCollision(player, o));
+      if (!obstacle) return;
+      const cx = clamp(player.x, obstacle.x, obstacle.x + obstacle.w);
+      const cy = clamp(player.y, obstacle.y, obstacle.y + obstacle.h);
+      const angle = Math.atan2(player.y - cy, player.x - cx) || -Math.PI / 2;
+      player.x += Math.cos(angle) * 8;
+      player.y += Math.sin(angle) * 8;
+      player.x = clamp(player.x, player.r + 8, W - player.r - 8);
+      player.y = clamp(player.y, player.r + 62, H - player.r - 8);
+    }
+  }
+
   function update(dt) {
     animationClock += dt;
     rainOffset += dt * 280;
@@ -422,13 +508,17 @@
 
     if (state !== "playing") {
       updateDecorations(dt);
+      updateParticles(dt);
+      updateFloatTexts(dt);
       return;
     }
 
     timeLeft -= dt;
+    levelIntroTimer = Math.max(0, levelIntroTimer - dt);
     invulnerable = Math.max(0, invulnerable - dt);
     actionCooldown = Math.max(0, actionCooldown - dt);
     player.bump = Math.max(0, player.bump - dt * 4);
+    player.celebrate = Math.max(0, player.celebrate - dt * 3);
     screenShake = Math.max(0, screenShake - dt * 3);
 
     let xAxis = 0;
@@ -456,6 +546,23 @@
     if (yAxis > 0 && Math.abs(yAxis) > Math.abs(xAxis)) player.facing = "down";
 
     movePlayer(xAxis * speed * dt, yAxis * speed * dt);
+    if (player.moving && sprinting) {
+      player.trailTimer -= dt;
+      if (player.trailTimer <= 0) {
+        player.trailTimer = .08;
+        particles.push({
+          x: player.x - xAxis * 18,
+          y: player.y + 20 - yAxis * 8,
+          vx: -xAxis * 28 + rand(-18, 18),
+          vy: -yAxis * 20 + rand(-10, 12),
+          life: .34,
+          maxLife: .34,
+          size: rand(3, 6),
+          color: isOnRoad(player.x, player.y, 4) ? "rgba(220,205,176,.8)" : "rgba(120,91,54,.5)",
+          gravity: 12
+        });
+      }
+    }
 
     updateCars(dt);
     updateCats(dt);
@@ -482,10 +589,16 @@
       car.y += car.dy * car.speed * dt;
       car.hornCooldown -= dt;
 
-      if (car.dx > 0 && car.x > W + 120) car.x = -140;
-      if (car.dx < 0 && car.x < -140) car.x = W + 120;
-      if (car.dy > 0 && car.y > H + 130) car.y = -150;
-      if (car.dy < 0 && car.y < -150) car.y = H + 130;
+      if (car.lane?.axis === "x") {
+        car.y = clamp(car.y, car.lane.road.y + 10, car.lane.road.y + car.lane.road.h - car.h - 10);
+      } else if (car.lane?.axis === "y") {
+        car.x = clamp(car.x, car.lane.road.x + 10, car.lane.road.x + car.lane.road.w - car.w - 10);
+      }
+
+      if (car.dx > 0 && car.x > W + 130) car.x = -150 - rand(0, 220);
+      if (car.dx < 0 && car.x < -150) car.x = W + 130 + rand(0, 220);
+      if (car.dy > 0 && car.y > H + 140) car.y = -170 - rand(0, 220);
+      if (car.dy < 0 && car.y < -170) car.y = H + 140 + rand(0, 220);
 
       const hitbox = { x: car.x + 7, y: car.y + 7, w: car.w - 14, h: car.h - 14 };
       if (invulnerable <= 0 && circleRectCollision(player, hitbox)) {
@@ -523,6 +636,7 @@
     screenShake = 1;
     player.x = clamp(player.x - car.dx * 65, 30, W - 30);
     player.y = clamp(player.y - car.dy * 65, 80, H - 30);
+    keepPlayerSafe();
     burst(player.x, player.y, "#ffdf77", 16);
     burst(player.x, player.y, "#ef5a43", 10);
     spawnText(player.x, player.y - 34, "-4 s", "#ef4038");
@@ -556,13 +670,19 @@
       return;
     }
 
+    const fastDelivery = lastDeliveryAt > 0 && (levelData.duration - timeLeft) - lastDeliveryAt < 18;
+    deliveryCombo = fastDelivery ? Math.min(deliveryCombo + 1, 5) : 1;
+    lastDeliveryAt = levelData.duration - timeLeft;
+
     delivered += 1;
-    score += 200 + Math.ceil(timeLeft * 2);
+    const comboBonus = deliveryCombo > 1 ? deliveryCombo * 35 : 0;
+    score += 200 + comboBonus + Math.ceil(timeLeft * 2);
     player.hasPizza = false;
+    player.celebrate = 1;
     burst(target.x, target.y, "#ffd25d", 28);
     burst(target.x, target.y, "#65b86f", 16);
-    spawnText(target.x, target.y - 48, "¡ENTREGADA!", "#27874d");
-    showToast("¡Pizza entregada! +200");
+    spawnText(target.x, target.y - 48, comboBonus ? `¡COMBO x${deliveryCombo}!` : "¡ENTREGADA!", "#27874d");
+    showToast(comboBonus ? `¡Pizza entregada! Combo +${comboBonus}` : "¡Pizza entregada! +200");
     sound("deliver");
 
     setTimeout(() => {
@@ -570,7 +690,7 @@
     }, 500);
 
     if (delivered >= levelData.required) {
-      setTimeout(() => finishLevel(true), 650);
+      setTimeout(() => finishLevel(true), 520);
       return;
     }
 
@@ -604,10 +724,19 @@
       localStorage.setItem(`pizzaDashStars${activeLevel}`, String(Math.max(previous, stars)));
       el.resultIcon.textContent = "🏆";
       el.resultEyebrow.textContent = "MISIÓN COMPLETA";
-      el.resultTitle.textContent = stars === 3 ? "¡Entrega perfecta!" : "¡Buen trabajo!";
-      el.resultMessage.textContent = `${levelData.name} ya tiene la cena lista.`;
+      const hasNextLevel = activeLevel < LEVELS.length - 1;
+      el.resultTitle.textContent = hasNextLevel ? "¡Ruta completada!" : (stars === 3 ? "¡Entrega perfecta!" : "¡Buen trabajo!");
+      el.resultMessage.textContent = hasNextLevel
+        ? `Siguiente parada: ${LEVELS[activeLevel + 1].name}`
+        : `${levelData.name} ya tiene la cena lista.`;
       el.resultStars.textContent = `${"★ ".repeat(stars)}${"☆ ".repeat(3 - stars)}`.trim();
-      el.nextBtn.classList.toggle("hidden", activeLevel >= LEVELS.length - 1);
+      el.nextBtn.classList.add("hidden");
+      el.retryBtn.classList.toggle("hidden", hasNextLevel);
+      el.resultMenuBtn.classList.toggle("hidden", hasNextLevel);
+      if (hasNextLevel) {
+        showToast(`¡Nivel ${activeLevel + 1} listo! Avanzando...`);
+        autoAdvanceTimer = setTimeout(() => beginLevel(activeLevel + 1), 1450);
+      }
       sound("win");
     } else {
       el.resultIcon.textContent = "🍕";
@@ -616,6 +745,8 @@
       el.resultMessage.textContent = "Inténtalo otra vez: ya conoces mejor la ruta.";
       el.resultStars.textContent = "☆ ☆ ☆";
       el.nextBtn.classList.add("hidden");
+      el.retryBtn.classList.remove("hidden");
+      el.resultMenuBtn.classList.remove("hidden");
       sound("lose");
     }
 
@@ -708,6 +839,27 @@
     if (levelData.theme === "night") drawNightOverlay();
 
     ctx.restore();
+    drawLevelBanner();
+  }
+
+  function drawLevelBanner() {
+    if (state !== "playing" || levelIntroTimer <= 0) return;
+    const alpha = clamp(levelIntroTimer / .8, 0, 1);
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    fillRoundedRect(ctx, W / 2 - 250, 102, 500, 86, 22, "rgba(36,22,47,.88)");
+    ctx.strokeStyle = "rgba(255,216,95,.8)";
+    ctx.lineWidth = 3;
+    roundedRectPath(ctx, W / 2 - 250, 102, 500, 86, 22);
+    ctx.stroke();
+    ctx.fillStyle = "#ffd85f";
+    ctx.font = "900 18px Trebuchet MS";
+    ctx.textAlign = "center";
+    ctx.fillText(`NIVEL ${activeLevel + 1}`, W / 2, 132);
+    ctx.fillStyle = "#fff";
+    ctx.font = "900 32px Trebuchet MS";
+    ctx.fillText(levelData.name, W / 2, 166);
+    ctx.restore();
   }
 
   function drawBackground() {
@@ -794,8 +946,7 @@
       }
     }
 
-    drawCrosswalk(548, 275, 170, 14, true);
-    drawCrosswalk(535, 435, 14, 78, false);
+    world.crosswalks.forEach(crosswalk => drawCrosswalk(crosswalk.x, crosswalk.y, crosswalk.w, crosswalk.h, crosswalk.horizontal));
   }
 
   function drawCrosswalk(x, y, w, h, horizontal) {
@@ -833,18 +984,67 @@
       ctx.ellipse(640, 245, 95, 50, 0, 0, Math.PI * 2);
       ctx.stroke();
 
+      ctx.strokeStyle = "rgba(255,255,255,.5)";
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc(640, 245, 42 + Math.sin(animationClock * 1.8) * 4, 0, Math.PI * 2);
+      ctx.stroke();
+      fillRoundedRect(ctx, 548, 118, 184, 52, 18, "rgba(68,145,90,.8)");
+      ctx.fillStyle = "#fff7d7";
+      ctx.font = "900 18px Trebuchet MS";
+      ctx.textAlign = "center";
+      ctx.fillText("PARQUE", 640, 150);
+
       drawLamp(470, 465);
       drawLamp(810, 465);
       drawLamp(475, 105);
       drawLamp(805, 105);
+    } else if (levelData.theme === "night") {
+      drawLamp(310, 252);
+      drawLamp(970, 252);
+      drawLamp(310, 468);
+      drawLamp(970, 468);
+      drawNeonSign(420, 255, "ABIERTO", "#65d9ff");
+      drawNeonSign(850, 468, "HOT", "#ff6f9a");
     } else {
       drawLamp(310, 252);
       drawLamp(970, 252);
       drawLamp(310, 468);
       drawLamp(970, 468);
+      drawYardSign(1030, 255, "2x1");
+      drawYardSign(230, 468, "META");
     }
 
     drawPizzeria();
+  }
+
+  function drawYardSign(x, y, text) {
+    ctx.fillStyle = "#6d432d";
+    ctx.fillRect(x - 4, y, 8, 34);
+    fillRoundedRect(ctx, x - 34, y - 30, 68, 32, 7, "#ffd85f");
+    ctx.strokeStyle = "#7b422f";
+    ctx.lineWidth = 3;
+    roundedRectPath(ctx, x - 34, y - 30, 68, 32, 7);
+    ctx.stroke();
+    ctx.fillStyle = "#8b2f2c";
+    ctx.font = "900 15px Trebuchet MS";
+    ctx.textAlign = "center";
+    ctx.fillText(text, x, y - 9);
+  }
+
+  function drawNeonSign(x, y, text, color) {
+    ctx.save();
+    ctx.shadowColor = color;
+    ctx.shadowBlur = 16 + Math.sin(animationClock * 8) * 5;
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 3;
+    fillRoundedRect(ctx, x - 58, y - 26, 116, 40, 8, "rgba(25,24,55,.78)");
+    ctx.strokeRect(x - 51, y - 20, 102, 28);
+    ctx.fillStyle = color;
+    ctx.font = "900 15px Trebuchet MS";
+    ctx.textAlign = "center";
+    ctx.fillText(text, x, y);
+    ctx.restore();
   }
 
   function drawLamp(x, y) {
@@ -1073,6 +1273,21 @@
     drawPizzaSlice(0, -8, .46);
     ctx.restore();
 
+    if (player) {
+      ctx.save();
+      ctx.strokeStyle = "rgba(255,208,77,.62)";
+      ctx.lineWidth = 5;
+      ctx.setLineDash([12, 13]);
+      ctx.lineDashOffset = -animationClock * 42;
+      ctx.beginPath();
+      ctx.moveTo(player.x, player.y - 27);
+      const midY = isOnRoad(player.x, player.y, 12) ? player.y : house.doorY;
+      ctx.quadraticCurveTo((player.x + x) / 2, midY, x, house.doorY);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.restore();
+    }
+
     const near = player && Math.hypot(player.x - house.doorX, player.y - house.doorY) < 85;
     if (near) {
       fillRoundedRect(ctx, x - 86, house.doorY + 12, 172, 35, 12, "rgba(36,22,47,.88)");
@@ -1206,9 +1421,11 @@
     const walk = player.moving ? Math.sin(animationClock * 13) : 0;
     const bob = player.moving ? Math.abs(Math.sin(animationClock * 13)) * 3 : Math.sin(animationClock * 2.4) * 1.2;
     const bumpRotation = player.bump > 0 ? Math.sin(animationClock * 28) * .18 * player.bump : 0;
+    const celebrateLift = player.celebrate > 0 ? Math.sin(player.celebrate * Math.PI) * 10 : 0;
+    const armWave = player.celebrate > 0 ? Math.sin(animationClock * 24) * 4 : 0;
 
     ctx.save();
-    ctx.translate(player.x, player.y + bob);
+    ctx.translate(player.x, player.y + bob - celebrateLift);
     ctx.rotate(bumpRotation);
 
     if (player.facing === "left") ctx.scale(-1, 1);
@@ -1259,10 +1476,17 @@
     ctx.strokeStyle = "#ce854e";
     ctx.lineWidth = 7;
     ctx.beginPath();
-    ctx.moveTo(-15, 3);
-    ctx.lineTo(-28, 7 + walk * 2);
-    ctx.moveTo(15, 3);
-    ctx.lineTo(25, 5 - walk * 2);
+    if (player.celebrate > 0) {
+      ctx.moveTo(-15, 1);
+      ctx.lineTo(-27, -17 + armWave);
+      ctx.moveTo(15, 1);
+      ctx.lineTo(27, -18 - armWave);
+    } else {
+      ctx.moveTo(-15, 3);
+      ctx.lineTo(-28, 7 + walk * 2);
+      ctx.moveTo(15, 3);
+      ctx.lineTo(25, 5 - walk * 2);
+    }
     ctx.stroke();
 
     if (player.hasPizza) {

@@ -29,6 +29,14 @@ body {
   overflow-x: hidden;
 }
 
+html {
+  height: 100%;
+}
+
+body {
+  min-height: 100dvh;
+}
+
 body::before {
   content: "";
   position: fixed;
@@ -57,7 +65,11 @@ button {
 .page-shell {
   width: min(1500px, 100%);
   margin: 0 auto;
-  padding: 28px;
+  min-height: 100dvh;
+  padding: clamp(8px, 2vw, 28px);
+  display: grid;
+  align-content: center;
+  gap: 12px;
 }
 
 .game-frame {
@@ -140,10 +152,12 @@ button {
   position: relative;
   overflow: hidden;
   width: 100%;
+  max-height: calc(100dvh - 118px);
   aspect-ratio: 16 / 9;
   border-radius: 20px;
   background: #8fd7ff;
   isolation: isolate;
+  touch-action: none;
 }
 
 #gameCanvas {
@@ -205,7 +219,7 @@ button {
   font-weight: 800;
   font-size: clamp(62px, 9vw, 132px);
   line-height: .72;
-  letter-spacing: -4px;
+  letter-spacing: 0;
   transform: rotate(-2deg);
   filter: drop-shadow(0 8px 0 rgba(61,18,33,.32));
 }
@@ -472,6 +486,8 @@ kbd {
 
 .panel {
   width: min(820px, 96%);
+  max-height: min(88dvh, 680px);
+  overflow: auto;
   padding: clamp(24px, 4vw, 46px);
   border-radius: 26px;
   background: rgba(255, 250, 239, .97);
@@ -963,6 +979,8 @@ kbd {
   background: rgba(36,22,47,.9);
   box-shadow: 0 12px 28px rgba(31,13,37,.28);
   animation: toastIn .25s ease both;
+  max-width: min(86%, 560px);
+  text-align: center;
 }
 
 @keyframes toastIn {
@@ -1000,6 +1018,8 @@ kbd {
   background: rgba(36,22,47,.72);
   backdrop-filter: blur(7px);
   font-weight: 900;
+  touch-action: none;
+  user-select: none;
 }
 
 .dpad-up { left: 50px; top: 0; }
@@ -1040,6 +1060,7 @@ kbd {
 
   .canvas-wrap {
     border-radius: 15px;
+    max-height: calc(100dvh - 74px);
   }
 
   .overlay-screen--menu {
@@ -1083,6 +1104,7 @@ kbd {
   .hud {
     inset: 8px 8px auto;
     grid-template-columns: 1fr 1fr;
+    gap: 7px;
   }
 
   .hud-center {
@@ -1094,11 +1116,59 @@ kbd {
   .hud-pill {
     min-height: 39px;
     padding: 5px 9px;
+    border-radius: 13px;
   }
 
   .hud-pill--level,
   .hud-pill--hearts {
     display: none;
+  }
+}
+
+@media (max-height: 720px) and (orientation: landscape) {
+  .page-shell {
+    padding: 4px;
+  }
+
+  .game-topbar {
+    height: 36px;
+    padding-bottom: 4px;
+  }
+
+  .canvas-wrap {
+    max-height: calc(100dvh - 46px);
+  }
+
+  .page-note {
+    display: none;
+  }
+
+  .overlay-screen {
+    padding: 10px;
+  }
+
+  .panel {
+    max-height: 92dvh;
+    padding: 18px;
+  }
+
+  .level-card {
+    min-height: 224px;
+  }
+
+  .level-scene {
+    height: 150px;
+  }
+
+  .how-item {
+    min-height: 170px;
+    padding: 18px 12px;
+  }
+
+  .how-illustration {
+    width: 58px;
+    height: 58px;
+    font-size: 26px;
   }
 }
 
@@ -1127,7 +1197,8 @@ kbd {
   }
 
   .logo-title {
-    font-size: 56px;
+    font-size: clamp(44px, 17vw, 56px);
+    letter-spacing: 0;
   }
 
   .menu-copy {
@@ -1151,6 +1222,11 @@ kbd {
     border-radius: 20px;
   }
 
+  .panel-heading h2,
+  .result-panel h2 {
+    font-size: clamp(26px, 9vw, 38px);
+  }
+
   .panel-heading {
     margin-bottom: 16px;
   }
@@ -1161,6 +1237,7 @@ kbd {
 
   .hud-group {
     gap: 4px;
+    flex-wrap: wrap;
   }
 
   .hud-pill strong {
@@ -1169,5 +1246,31 @@ kbd {
 
   .hud-pill--hearts {
     display: none;
+  }
+
+  .mission-card > span {
+    font-size: 12px;
+  }
+
+  .dpad {
+    width: 132px;
+    height: 132px;
+  }
+
+  .dpad button {
+    width: 44px;
+    height: 44px;
+    border-radius: 14px;
+  }
+
+  .dpad-up { left: 44px; top: 0; }
+  .dpad-left { left: 0; top: 44px; }
+  .dpad-down { left: 44px; top: 88px; }
+  .dpad-right { left: 88px; top: 44px; }
+
+  .mobile-action {
+    width: 66px;
+    height: 66px;
+    font-size: 24px;
   }
 }

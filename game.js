@@ -281,7 +281,7 @@
       });
     }
 
-    const obstacles = houses.map(h => ({ x: h.x, y: h.y, w: h.w, h: h.h + 10, type: "house" }));
+    const obstacles = houses.map(makeHouseObstacle);
     const trees = [];
     const benches = [];
     const puddles = [];
@@ -352,6 +352,16 @@
 
   function makeHouse(x, y, w, h, wall, roof, doorX, doorY) {
     return { x, y, w, h, wall, roof, doorX, doorY, night: false };
+  }
+
+  function makeHouseObstacle(house) {
+    return {
+      x: house.x + 28,
+      y: house.y + 34,
+      w: house.w - 56,
+      h: Math.max(22, house.h - 112),
+      type: "house"
+    };
   }
 
   function makeCar(x, y, w, h, dx, dy, color, speed, lane) {
@@ -476,6 +486,7 @@
   }
 
   function movePlayer(dx, dy) {
+    resolvePlayerObstacles();
     const previousX = player.x;
     const previousY = player.y;
     player.x = clamp(player.x + dx, player.r + 8, W - player.r - 8);
@@ -485,8 +496,8 @@
     player.y = clamp(player.y + dy, player.r + 62, H - player.r - 8);
     resolvePlayerObstacles();
 
-    if (!movedX && Math.abs(dx) > .01 && Math.abs(dy) < .01) {
-      player.y = clamp(previousY + Math.sign(dx) * 5, player.r + 62, H - player.r - 8);
+    if (!movedX && Math.abs(dx) > .01 && Math.abs(dy) < .01 && Math.abs(player.y - previousY) < .01) {
+      player.y = clamp(previousY + Math.sign(dx) * 7, player.r + 62, H - player.r - 8);
       resolvePlayerObstacles();
     }
   }
@@ -526,7 +537,7 @@
         dy = min === top ? -1 : min === bottom ? 1 : 0;
         length = 1;
       }
-      const overlap = player.r - length + .8;
+      const overlap = Math.max(0, player.r - length + 1.5);
       player.x = clamp(player.x + (dx / length) * overlap, player.r + 8, W - player.r - 8);
       player.y = clamp(player.y + (dy / length) * overlap, player.r + 62, H - player.r - 8);
     }

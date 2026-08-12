@@ -47,7 +47,7 @@
       grass: "#86c968",
       road: "#6c7480",
       accent: "#ef5a43",
-      start: { x: 110, y: 600 }
+      start: { x: 132, y: 360 }
     },
     {
       name: "Parque Central",
@@ -59,7 +59,7 @@
       grass: "#75bd65",
       road: "#7c786f",
       accent: "#3e9b5f",
-      start: { x: 115, y: 610 }
+      start: { x: 132, y: 580 }
     },
     {
       name: "Ciudad Nocturna",
@@ -71,7 +71,7 @@
       grass: "#334b52",
       road: "#3f4659",
       accent: "#8d5fd3",
-      start: { x: 105, y: 610 }
+      start: { x: 132, y: 360 }
     }
   ];
 
@@ -443,6 +443,7 @@
       celebrate: 0,
       trailTimer: 0
     };
+    placePlayerSafely();
     timeLeft = levelData.duration;
     delivered = 0;
     score = 0;
@@ -498,6 +499,27 @@
       player.y += Math.sin(angle) * 8;
       player.x = clamp(player.x, player.r + 8, W - player.r - 8);
       player.y = clamp(player.y, player.r + 62, H - player.r - 8);
+    }
+  }
+
+  function placePlayerSafely() {
+    if (!world.obstacles.some(o => circleRectCollision(player, o))) return;
+    const roadCenters = world.roads.flatMap(road => road.axis === "x"
+      ? [
+          { x: 132, y: road.y + road.h / 2 },
+          { x: W - 132, y: road.y + road.h / 2 },
+          { x: W / 2, y: road.y + road.h / 2 }
+        ]
+      : [
+          { x: road.x + road.w / 2, y: 104 },
+          { x: road.x + road.w / 2, y: H - 104 },
+          { x: road.x + road.w / 2, y: H / 2 }
+        ]
+    );
+    const safe = roadCenters.find(point => !world.obstacles.some(o => circleRectCollision({ ...point, r: player.r }, o)));
+    if (safe) {
+      player.x = safe.x;
+      player.y = safe.y;
     }
   }
 

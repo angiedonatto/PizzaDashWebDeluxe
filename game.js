@@ -47,7 +47,7 @@
       grass: "#86c968",
       road: "#6c7480",
       accent: "#ef5a43",
-      start: { x: 132, y: 360 }
+      start: { x: 632, y: 360 }
     },
     {
       name: "Parque Central",
@@ -59,7 +59,7 @@
       grass: "#75bd65",
       road: "#7c786f",
       accent: "#3e9b5f",
-      start: { x: 132, y: 580 }
+      start: { x: 600, y: 580 }
     },
     {
       name: "Ciudad Nocturna",
@@ -71,7 +71,7 @@
       grass: "#334b52",
       road: "#3f4659",
       accent: "#8d5fd3",
-      start: { x: 132, y: 360 }
+      start: { x: 632, y: 360 }
     }
   ];
 
@@ -476,13 +476,18 @@
   }
 
   function movePlayer(dx, dy) {
-    const nextX = { x: player.x + dx, y: player.y, r: player.r };
-    if (!world.obstacles.some(o => circleRectCollision(nextX, o))) {
-      player.x = clamp(nextX.x, player.r + 8, W - player.r - 8);
-    }
-    const nextY = { x: player.x, y: player.y + dy, r: player.r };
-    if (!world.obstacles.some(o => circleRectCollision(nextY, o))) {
-      player.y = clamp(nextY.y, player.r + 62, H - player.r - 8);
+    const previousX = player.x;
+    const previousY = player.y;
+    player.x = clamp(player.x + dx, player.r + 8, W - player.r - 8);
+    resolvePlayerObstacles();
+
+    const movedX = Math.abs(player.x - previousX) > .01;
+    player.y = clamp(player.y + dy, player.r + 62, H - player.r - 8);
+    resolvePlayerObstacles();
+
+    if (!movedX && Math.abs(dx) > .01 && Math.abs(dy) < .01) {
+      player.y = clamp(previousY + Math.sign(dx) * 5, player.r + 62, H - player.r - 8);
+      resolvePlayerObstacles();
     }
   }
 
@@ -499,6 +504,31 @@
       player.y += Math.sin(angle) * 8;
       player.x = clamp(player.x, player.r + 8, W - player.r - 8);
       player.y = clamp(player.y, player.r + 62, H - player.r - 8);
+    }
+  }
+
+  function resolvePlayerObstacles() {
+    for (let i = 0; i < 6; i++) {
+      const obstacle = world.obstacles.find(o => circleRectCollision(player, o));
+      if (!obstacle) return;
+      const closestX = clamp(player.x, obstacle.x, obstacle.x + obstacle.w);
+      const closestY = clamp(player.y, obstacle.y, obstacle.y + obstacle.h);
+      let dx = player.x - closestX;
+      let dy = player.y - closestY;
+      let length = Math.hypot(dx, dy);
+      if (length < .001) {
+        const left = Math.abs(player.x - obstacle.x);
+        const right = Math.abs(obstacle.x + obstacle.w - player.x);
+        const top = Math.abs(player.y - obstacle.y);
+        const bottom = Math.abs(obstacle.y + obstacle.h - player.y);
+        const min = Math.min(left, right, top, bottom);
+        dx = min === left ? -1 : min === right ? 1 : 0;
+        dy = min === top ? -1 : min === bottom ? 1 : 0;
+        length = 1;
+      }
+      const overlap = player.r - length + .8;
+      player.x = clamp(player.x + (dx / length) * overlap, player.r + 8, W - player.r - 8);
+      player.y = clamp(player.y + (dy / length) * overlap, player.r + 62, H - player.r - 8);
     }
   }
 

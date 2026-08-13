@@ -91,6 +91,7 @@
   let delivered = 0;
   let score = 0;
   let hearts = 3;
+  let pizzasCarried = 0;
   let currentTarget = 0;
   let invulnerable = 0;
   let actionCooldown = 0;
@@ -107,6 +108,8 @@
   let stormTimer = 0;
   const particles = [];
   const floatTexts = [];
+  const MAX_PIZZAS = 2;
+  const PIZZERIA = { x: 12, y: 527, w: 205, h: 122, refillX: 114, refillY: 585, radius: 88 };
 
   const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
   const lerp = (a, b, t) => a + (b - a) * t;
@@ -456,7 +459,6 @@
       speed: 215,
       facing: "right",
       moving: false,
-      hasPizza: true,
       bump: 0,
       celebrate: 0,
       trailTimer: 0
@@ -468,6 +470,7 @@
     delivered = 0;
     score = 0;
     hearts = 3;
+    pizzasCarried = MAX_PIZZAS;
     currentTarget = 0;
     invulnerable = 0;
     actionCooldown = 0;
@@ -661,6 +664,7 @@
     updateCars(dt);
     updateCats(dt);
     updateCoins();
+    updatePizzeriaRefill();
     updateRival(dt);
     updateLightning(dt);
     updateParticles(dt);
@@ -752,6 +756,18 @@
     }
   }
 
+  function updatePizzeriaRefill() {
+    if (pizzasCarried >= MAX_PIZZAS) return;
+    const nearPizzeria = Math.hypot(player.x - PIZZERIA.refillX, player.y - PIZZERIA.refillY) < PIZZERIA.radius;
+    if (!nearPizzeria) return;
+    pizzasCarried = MAX_PIZZAS;
+    burst(PIZZERIA.refillX, PIZZERIA.refillY, "#ffd25d", 18);
+    spawnText(PIZZERIA.refillX, PIZZERIA.refillY - 38, "RECARGA x2", "#f2a82f");
+    showToast("Mochila recargada: 2 pizzas");
+    sound("coin");
+    updateHud();
+  }
+
   function updateRival(dt) {
     if (!rival || state !== "playing") return;
     rival.wait = Math.max(0, rival.wait - dt);
@@ -832,6 +848,12 @@
 
     actionCooldown = .35;
 
+    if (pizzasCarried <= 0) {
+      showToast("Sin pizzas. Vuelve a la pizzería");
+      sound("click");
+      return;
+    }
+
     if (!near) {
       showToast("Acércate a la puerta marcada");
       sound("click");
@@ -843,19 +865,15 @@
     lastDeliveryAt = levelData.duration - timeLeft;
 
     delivered += 1;
+    pizzasCarried -= 1;
     const comboBonus = deliveryCombo > 1 ? deliveryCombo * 35 : 0;
     score += 200 + comboBonus + Math.ceil(timeLeft * 2);
-    player.hasPizza = false;
     player.celebrate = 1;
     burst(target.x, target.y, "#ffd25d", 28);
     burst(target.x, target.y, "#65b86f", 16);
     spawnText(target.x, target.y - 48, comboBonus ? `¡COMBO x${deliveryCombo}!` : "¡ENTREGADA!", "#27874d");
     showToast(comboBonus ? `¡Pizza entregada! Combo +${comboBonus}` : "¡Pizza entregada! +200");
     sound("deliver");
-
-    setTimeout(() => {
-      if (player) player.hasPizza = true;
-    }, 500);
 
     if (delivered >= levelData.required) {
       setTimeout(() => finishLevel(true), 520);
@@ -926,11 +944,13 @@
   function updateHud() {
     el.hudLevel.textContent = String(activeLevel + 1);
     el.hudTime.textContent = formatTime(timeLeft);
-    el.hudDeliveries.textContent = `${delivered}/${levelData.required}`;
+    el.hudDeliveries.textContent = `${pizzasCarried}/${MAX_PIZZAS} · ${delivered}/${levelData.required}`;
     el.hudScore.textContent = String(score);
     el.hudHearts.textContent = `${"♥ ".repeat(hearts)}${"♡ ".repeat(3 - hearts)}`.trim();
     el.missionText.textContent = delivered >= levelData.required
       ? "¡Todas las pizzas fueron entregadas!"
+      : pizzasCarried <= 0
+        ? "Vuelve a la pizzería para recargar"
       : rival
         ? `Carrera: tú ${delivered}/${levelData.required} · rival ${rival.delivered}/${levelData.required}`
         : "Entrega en la casa marcada";
@@ -1241,10 +1261,28 @@
   }
 
   function drawPizzeria() {
-    const x = 12;
-    const y = 527;
+    const x = PIZZERIA.x;
+    const y = PIZZERIA.y;
     ctx.save();
     ctx.translate(x, y);
+    if (state === "playing" && pizzasCarried < MAX_PIZZAS) {
+      ctx.save();
+      ctx.translate(PIZZERIA.refillX - x, PIZZERIA.refillY - y);
+      const pulse = 1 + Math.sin(animationClock * 6) * .08;
+      ctx.scale(pulse, pulse);
+      ctx.fillStyle = "rgba(255,210,93,.18)";
+      ctx.beginPath();
+      ctx.arc(0, 0, PIZZERIA.radius, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = "rgba(255,210,93,.72)";
+      ctx.lineWidth = 4;
+      ctx.setLineDash([12, 10]);
+      ctx.beginPath();
+      ctx.arc(0, 0, PIZZERIA.radius - 10, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.restore();
+    }
     ctx.fillStyle = "rgba(61,34,39,.16)";
     fillRoundedRect(ctx, 8, 18, 208, 128, 16, "rgba(61,34,39,.18)");
     fillRoundedRect(ctx, 0, 0, 205, 122, 14, levelData.theme === "night" ? "#4e4159" : "#f4d49e");
@@ -1752,19 +1790,22 @@
     }
     ctx.stroke();
 
-    if (player.hasPizza) {
+    if (pizzasCarried > 0) {
       ctx.save();
       ctx.translate(4, 4);
       ctx.rotate(-.08);
-      fillRoundedRect(ctx, -23, -7, 48, 21, 5, "#eeb55e");
-      ctx.strokeStyle = "#754231";
-      ctx.lineWidth = 3;
-      roundedRectPath(ctx, -23, -7, 48, 21, 5);
-      ctx.stroke();
-      ctx.fillStyle = "#9a3a31";
-      ctx.font = "900 8px Nunito";
-      ctx.textAlign = "center";
-      ctx.fillText("PIZZA", 1, 7);
+      for (let i = 0; i < pizzasCarried; i++) {
+        const y = -7 - i * 8;
+        fillRoundedRect(ctx, -23, y, 48, 21, 5, "#eeb55e");
+        ctx.strokeStyle = "#754231";
+        ctx.lineWidth = 3;
+        roundedRectPath(ctx, -23, y, 48, 21, 5);
+        ctx.stroke();
+        ctx.fillStyle = "#9a3a31";
+        ctx.font = "900 8px Nunito";
+        ctx.textAlign = "center";
+        ctx.fillText("PIZZA", 1, y + 14);
+      }
       ctx.restore();
     }
 

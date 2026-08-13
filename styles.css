@@ -1212,13 +1212,31 @@ kbd {
   }
 
   .game-topbar {
-    height: 42px;
-    padding: 6px 10px;
-    background: rgba(18,15,27,.96);
+    position: absolute;
+    z-index: 24;
+    top: max(6px, env(safe-area-inset-top));
+    left: 8px;
+    right: 8px;
+    height: 34px;
+    padding: 0;
+    background: transparent;
+    pointer-events: none;
+  }
+
+  .topbar-actions,
+  .mini-brand {
+    pointer-events: auto;
+    border-radius: 12px;
+    background: rgba(18,15,27,.68);
+    backdrop-filter: blur(8px);
   }
 
   .mini-brand {
-    font-size: 15px;
+    padding: 3px 8px 3px 3px;
+  }
+
+  .mini-brand {
+    font-size: 13px;
   }
 
   .mini-brand__slice {
@@ -1235,7 +1253,7 @@ kbd {
 
   .canvas-wrap {
     width: 100dvw;
-    height: calc(100dvh - 42px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+    height: calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom));
     max-height: none;
     aspect-ratio: auto;
     border-radius: 0;
@@ -1253,7 +1271,7 @@ kbd {
   }
 
   .overlay-screen {
-    padding: 10px;
+    padding: max(48px, env(safe-area-inset-top)) 10px max(14px, env(safe-area-inset-bottom));
     overflow: hidden;
   }
 
@@ -1335,7 +1353,7 @@ kbd {
   }
 
   .hud {
-    inset: 6px 6px auto;
+    inset: 46px 6px auto;
   }
 
   .hud-pill {
@@ -1363,24 +1381,24 @@ kbd {
   }
 
   .dpad {
-    width: 132px;
-    height: 132px;
+    width: 118px;
+    height: 118px;
   }
 
   .dpad button {
-    width: 44px;
-    height: 44px;
+    width: 40px;
+    height: 40px;
     border-radius: 14px;
   }
 
-  .dpad-up { left: 44px; top: 0; }
-  .dpad-left { left: 0; top: 44px; }
-  .dpad-down { left: 44px; top: 88px; }
-  .dpad-right { left: 88px; top: 44px; }
+  .dpad-up { left: 39px; top: 0; }
+  .dpad-left { left: 0; top: 39px; }
+  .dpad-down { left: 39px; top: 78px; }
+  .dpad-right { left: 78px; top: 39px; }
 
   .mobile-action {
-    width: 66px;
-    height: 66px;
+    width: 60px;
+    height: 60px;
     font-size: 24px;
   }
 }

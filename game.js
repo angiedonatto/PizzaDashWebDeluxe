@@ -43,6 +43,7 @@
       required: 3,
       traffic: 105,
       theme: "neighborhood",
+      mode: "solo",
       sky: "#8ed8ff",
       grass: "#86c968",
       road: "#6c7480",
@@ -55,6 +56,7 @@
       required: 4,
       traffic: 125,
       theme: "park",
+      mode: "race",
       sky: "#a6e4ff",
       grass: "#75bd65",
       road: "#7c786f",
@@ -67,6 +69,7 @@
       required: 5,
       traffic: 155,
       theme: "night",
+      mode: "stormRace",
       sky: "#202757",
       grass: "#334b52",
       road: "#3f4659",
@@ -100,6 +103,8 @@
   let lastDeliveryAt = 0;
   let autoAdvanceTimer = 0;
   let levelIntroTimer = 0;
+  let rival = null;
+  let stormTimer = 0;
   const particles = [];
   const floatTexts = [];
 
@@ -281,7 +286,7 @@
       });
     }
 
-    const obstacles = houses.map(makeHouseObstacle);
+    const obstacles = houses.flatMap(makeHouseObstacles);
     const trees = [];
     const benches = [];
     const puddles = [];
@@ -347,21 +352,24 @@
 
     const crosswalks = createCrosswalks(roads);
 
-    return { roads, houses, obstacles, trees, benches, puddles, cats, cars, coins, flowerSeed, crosswalks };
+    return { roads, houses, obstacles, trees, benches, puddles, cats, cars, coins, flowerSeed, crosswalks, lightning: [] };
   }
 
   function makeHouse(x, y, w, h, wall, roof, doorX, doorY) {
     return { x, y, w, h, wall, roof, doorX, doorY, night: false };
   }
 
-  function makeHouseObstacle(house) {
-    return {
-      x: house.x + 28,
-      y: house.y + 34,
-      w: house.w - 56,
-      h: Math.max(22, house.h - 112),
+  function makeHouseObstacles(house) {
+    const body = {
+      x: house.x + 16,
+      y: house.y + 24,
+      w: house.w - 32,
+      h: Math.max(48, house.h - 78),
       type: "house"
     };
+    const leftShrub = { x: house.x + 2, y: house.y + house.h - 24, w: 34, h: 30, type: "yard" };
+    const rightShrub = { x: house.x + house.w - 36, y: house.y + house.h - 24, w: 34, h: 30, type: "yard" };
+    return [body, leftShrub, rightShrub];
   }
 
   function makeCar(x, y, w, h, dx, dy, color, speed, lane) {
@@ -454,6 +462,8 @@
       trailTimer: 0
     };
     placePlayerSafely();
+    rival = createRival(index);
+    stormTimer = levelData.mode === "stormRace" ? 3.8 : 0;
     timeLeft = levelData.duration;
     delivered = 0;
     score = 0;
@@ -473,6 +483,23 @@
     updateHud();
     showToast(`Nivel ${index + 1}: ${levelData.name}`);
     sound("click");
+  }
+
+  function createRival(index) {
+    if (LEVELS[index].mode === "solo") return null;
+    return {
+      x: W - 118,
+      y: LEVELS[index].theme === "park" ? 585 : 360,
+      r: 18,
+      speed: index === 2 ? 178 : 158,
+      target: 1,
+      delivered: 0,
+      wait: .7,
+      color: index === 2 ? "#65d9ff" : "#7d4ab5",
+      facing: "left",
+      moving: false,
+      dash: 0
+    };
   }
 
   function togglePause() {
@@ -519,27 +546,31 @@
   }
 
   function resolvePlayerObstacles() {
-    for (let i = 0; i < 6; i++) {
-      const obstacle = world.obstacles.find(o => circleRectCollision(player, o));
+    resolveCircleObstacles(player, 6);
+  }
+
+  function resolveCircleObstacles(circle, iterations) {
+    for (let i = 0; i < iterations; i++) {
+      const obstacle = world.obstacles.find(o => circleRectCollision(circle, o));
       if (!obstacle) return;
-      const closestX = clamp(player.x, obstacle.x, obstacle.x + obstacle.w);
-      const closestY = clamp(player.y, obstacle.y, obstacle.y + obstacle.h);
-      let dx = player.x - closestX;
-      let dy = player.y - closestY;
+      const closestX = clamp(circle.x, obstacle.x, obstacle.x + obstacle.w);
+      const closestY = clamp(circle.y, obstacle.y, obstacle.y + obstacle.h);
+      let dx = circle.x - closestX;
+      let dy = circle.y - closestY;
       let length = Math.hypot(dx, dy);
       if (length < .001) {
-        const left = Math.abs(player.x - obstacle.x);
-        const right = Math.abs(obstacle.x + obstacle.w - player.x);
-        const top = Math.abs(player.y - obstacle.y);
-        const bottom = Math.abs(obstacle.y + obstacle.h - player.y);
+        const left = Math.abs(circle.x - obstacle.x);
+        const right = Math.abs(obstacle.x + obstacle.w - circle.x);
+        const top = Math.abs(circle.y - obstacle.y);
+        const bottom = Math.abs(obstacle.y + obstacle.h - circle.y);
         const min = Math.min(left, right, top, bottom);
         dx = min === left ? -1 : min === right ? 1 : 0;
         dy = min === top ? -1 : min === bottom ? 1 : 0;
         length = 1;
       }
-      const overlap = Math.max(0, player.r - length + 1.5);
-      player.x = clamp(player.x + (dx / length) * overlap, player.r + 8, W - player.r - 8);
-      player.y = clamp(player.y + (dy / length) * overlap, player.r + 62, H - player.r - 8);
+      const overlap = Math.max(0, circle.r - length + 1.5);
+      circle.x = clamp(circle.x + (dx / length) * overlap, circle.r + 8, W - circle.r - 8);
+      circle.y = clamp(circle.y + (dy / length) * overlap, circle.r + 62, H - circle.r - 8);
     }
   }
 
@@ -630,6 +661,8 @@
     updateCars(dt);
     updateCats(dt);
     updateCoins();
+    updateRival(dt);
+    updateLightning(dt);
     updateParticles(dt);
     updateFloatTexts(dt);
 
@@ -716,6 +749,78 @@
         spawnText(coin.x, coin.y - 28, "+50", "#f2a82f");
         sound("coin");
       }
+    }
+  }
+
+  function updateRival(dt) {
+    if (!rival || state !== "playing") return;
+    rival.wait = Math.max(0, rival.wait - dt);
+    rival.dash = Math.max(0, rival.dash - dt * 2);
+    if (rival.wait > 0) {
+      rival.moving = false;
+      return;
+    }
+
+    const house = world.houses[rival.target % world.houses.length];
+    const target = { x: house.doorX, y: house.doorY };
+    const dx = target.x - rival.x;
+    const dy = target.y - rival.y;
+    const d = Math.hypot(dx, dy) || 1;
+    rival.moving = d > 7;
+    rival.facing = dx < 0 ? "left" : "right";
+    const speedBoost = levelData.mode === "stormRace" && timeLeft < levelData.duration * .55 ? 1.14 : 1;
+    rival.x += (dx / d) * rival.speed * speedBoost * dt;
+    rival.y += (dy / d) * rival.speed * speedBoost * dt;
+    resolveCircleObstacles(rival, 4);
+
+    if (d < 42) {
+      rival.delivered += 1;
+      rival.wait = levelData.mode === "stormRace" ? .65 : .9;
+      rival.dash = 1;
+      burst(target.x, target.y, rival.color, 12);
+      spawnText(target.x, target.y - 30, "RIVAL +1", rival.color);
+      rival.target = findNextTarget(rival.target + 1);
+      if (rival.delivered >= levelData.required) {
+        showToast("El rival entregó primero");
+        setTimeout(() => finishLevel(false), 450);
+      }
+    }
+  }
+
+  function updateLightning(dt) {
+    if (levelData.mode !== "stormRace") return;
+    stormTimer -= dt;
+    if (stormTimer <= 0 && player) {
+      stormTimer = rand(3.1, 4.8);
+      world.lightning.push({
+        x: player.x + rand(-42, 42),
+        y: player.y + rand(-36, 36),
+        r: 28,
+        life: 1.15,
+        strikeAt: .42,
+        hit: false
+      });
+      showToast("¡Rayo acercándose!");
+    }
+
+    for (let i = world.lightning.length - 1; i >= 0; i--) {
+      const bolt = world.lightning[i];
+      bolt.life -= dt;
+      if (!bolt.hit && bolt.life <= bolt.strikeAt) {
+        bolt.hit = true;
+        screenShake = Math.max(screenShake, .75);
+        burst(bolt.x, bolt.y, "#d6f3ff", 18);
+        burst(bolt.x, bolt.y, "#ffe77d", 10);
+        if (invulnerable <= 0 && Math.hypot(player.x - bolt.x, player.y - bolt.y) < player.r + bolt.r) {
+          hearts -= 1;
+          timeLeft = Math.max(0, timeLeft - 3);
+          invulnerable = 1.1;
+          player.bump = 1;
+          spawnText(player.x, player.y - 34, "-3 s", "#65d9ff");
+          sound("crash");
+        }
+      }
+      if (bolt.life <= 0) world.lightning.splice(i, 1);
     }
   }
 
@@ -826,7 +931,9 @@
     el.hudHearts.textContent = `${"♥ ".repeat(hearts)}${"♡ ".repeat(3 - hearts)}`.trim();
     el.missionText.textContent = delivered >= levelData.required
       ? "¡Todas las pizzas fueron entregadas!"
-      : `Entrega en la casa marcada`;
+      : rival
+        ? `Carrera: tú ${delivered}/${levelData.required} · rival ${rival.delivered}/${levelData.required}`
+        : "Entrega en la casa marcada";
     el.missionProgress.style.width = `${(delivered / levelData.required) * 100}%`;
   }
 
@@ -893,9 +1000,11 @@
       drawBenches();
       drawCoins();
       drawTarget();
+      drawLightning();
       drawCats();
       drawCars();
     }
+    if (rival) drawRival();
     if (player) drawPlayer();
     drawParticles();
     drawFloatTexts();
@@ -1395,6 +1504,47 @@
     for (const car of world.cars) drawCar(car);
   }
 
+  function drawLightning() {
+    if (!world?.lightning?.length) return;
+    for (const bolt of world.lightning) {
+      const warning = bolt.life > bolt.strikeAt;
+      const pulse = 1 + Math.sin(animationClock * 18) * .08;
+      ctx.save();
+      ctx.translate(bolt.x, bolt.y);
+      ctx.scale(pulse, pulse);
+      if (warning) {
+        ctx.strokeStyle = "rgba(255,232,97,.82)";
+        ctx.lineWidth = 4;
+        ctx.setLineDash([10, 8]);
+        ctx.beginPath();
+        ctx.arc(0, 0, bolt.r, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.fillStyle = "rgba(255,232,97,.14)";
+        ctx.beginPath();
+        ctx.arc(0, 0, bolt.r, 0, Math.PI * 2);
+        ctx.fill();
+      } else {
+        ctx.strokeStyle = "rgba(214,243,255,.95)";
+        ctx.lineWidth = 7;
+        ctx.shadowColor = "#d6f3ff";
+        ctx.shadowBlur = 18;
+        ctx.beginPath();
+        ctx.moveTo(-8, -160);
+        ctx.lineTo(9, -78);
+        ctx.lineTo(-11, -76);
+        ctx.lineTo(8, 0);
+        ctx.lineTo(-8, 62);
+        ctx.stroke();
+        ctx.fillStyle = "rgba(101,217,255,.22)";
+        ctx.beginPath();
+        ctx.arc(0, 0, bolt.r + 10, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.restore();
+    }
+  }
+
   function drawCar(car) {
     ctx.save();
     ctx.translate(car.x + car.w / 2, car.y + car.h / 2);
@@ -1475,6 +1625,56 @@
       ctx.stroke();
       ctx.restore();
     }
+  }
+
+  function drawRival() {
+    const walk = rival.moving ? Math.sin(animationClock * 14) : 0;
+    const bob = rival.moving ? Math.abs(Math.sin(animationClock * 14)) * 3 : Math.sin(animationClock * 2) * 1.1;
+    ctx.save();
+    ctx.translate(rival.x, rival.y + bob - rival.dash * 8);
+    if (rival.facing === "left") ctx.scale(-1, 1);
+
+    ctx.fillStyle = "rgba(30,20,35,.25)";
+    ctx.beginPath();
+    ctx.ellipse(0, 22, 21, 7, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.strokeStyle = "#2c2940";
+    ctx.lineWidth = 7;
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    ctx.moveTo(-7, 12);
+    ctx.lineTo(-10 + walk * 3, 25);
+    ctx.moveTo(7, 12);
+    ctx.lineTo(10 - walk * 3, 25);
+    ctx.stroke();
+
+    fillRoundedRect(ctx, -18, -7, 36, 31, 12, rival.color);
+    fillRoundedRect(ctx, -22, 1, 44, 18, 6, "#f0b957");
+    ctx.fillStyle = "#6f3240";
+    ctx.font = "900 7px Trebuchet MS";
+    ctx.textAlign = "center";
+    ctx.fillText("RIVAL", 0, 13);
+
+    ctx.fillStyle = "#b87848";
+    ctx.beginPath();
+    ctx.arc(0, -22, 17, 0, Math.PI * 2);
+    ctx.fill();
+    fillRoundedRect(ctx, -17, -42, 34, 12, 5, "#2c2940");
+    ctx.fillStyle = "#1c1830";
+    ctx.beginPath();
+    ctx.arc(6, -22, 2, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.strokeStyle = "#b87848";
+    ctx.lineWidth = 7;
+    ctx.beginPath();
+    ctx.moveTo(-15, 3);
+    ctx.lineTo(-25, 7 + walk * 2);
+    ctx.moveTo(15, 3);
+    ctx.lineTo(26, 6 - walk * 2);
+    ctx.stroke();
+    ctx.restore();
   }
 
   function drawPlayer() {

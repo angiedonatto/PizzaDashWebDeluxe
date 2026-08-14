@@ -5,6 +5,8 @@ const LEVELS = [{
   traffic: 105,
   theme: "neighborhood",
   mode: "solo",
+  pizzaCost: 50,
+  pizzeriaStyle: "classic",
   sky: "#8ed8ff",
   grass: "#86c968",
   road: "#6c7480",

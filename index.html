@@ -19,6 +19,7 @@
         </div>
         <div class="topbar-actions">
           <button id="soundBtn" class="icon-button" type="button" aria-label="Activar o desactivar sonido">🔊</button>
+          <button id="shopBtn" class="icon-button" type="button" aria-label="Abrir tienda">🛒</button>
           <button id="pauseBtn" class="icon-button hidden" type="button" aria-label="Pausar">Ⅱ</button>
         </div>
       </header>
@@ -219,6 +220,20 @@
               <button id="resumeBtn" class="primary-button primary-button--small" type="button">CONTINUAR</button>
               <button id="pauseMenuBtn" class="secondary-button" type="button">MENÚ</button>
             </div>
+          </div>
+        </section>
+
+        <section id="shopScreen" class="overlay-screen hidden">
+          <div class="panel shop-panel">
+            <span class="eyebrow">TIENDA DEL BARRIO</span>
+            <h2>Mercado de mejoras</h2>
+            <p>WASD o flechas para elegir · Enter o Espacio para comprar</p>
+            <div class="shop-grid">
+              <button class="shop-card" data-shop-index="0" id="speedUpgradeBtn" type="button"><span class="shop-card-icon">🏃</span><strong>Zapatos turbo</strong><small>Velocidad +25</small><b></b></button>
+              <button class="shop-card" data-shop-index="1" id="capacityUpgradeBtn" type="button"><span class="shop-card-icon">🍕</span><strong>Mochila grande</strong><small>Capacidad +1</small><b></b></button>
+              <button class="shop-card" data-shop-index="2" id="healthUpgradeBtn" type="button"><span class="shop-card-icon">♥</span><strong>Corazón extra</strong><small>Salud +1</small><b></b></button>
+            </div>
+            <button id="closeShopBtn" class="secondary-button" type="button">CERRAR (ESC)</button>
           </div>
         </section>
 

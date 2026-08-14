@@ -6,12 +6,18 @@ This is a static browser game built with plain HTML, CSS, and JavaScript. There 
 
 - `index.html`: page structure, screens, HUD, and mobile controls.
 - `styles.css`: responsive layout, overlays, HUD, menu, and touch controls.
-- `game.js`: game state, level definitions, drawing, movement, collisions, audio, rival AI, and effects.
+- `game.js`: shared game state, drawing, movement, collisions, audio, rival AI, and effects.
+- `assets/levels/level-1/config.js`: Barrio Soleado configuration.
+- `assets/levels/level-2/config.js`: Parque Central configuration.
+- `assets/levels/level-3/config.js`: Ciudad Nocturna configuration.
+- `assets/menu/`: reserved for menu-specific assets; current menu markup and styling remain in `index.html` and `styles.css`.
 - `README.md`: user-facing run instructions.
 - `.github/workflows/pages.yml`: GitHub Pages deployment workflow.
 - `.nojekyll`: keeps GitHub Pages from processing the site with Jekyll.
 
-There are currently no separate asset or test directories; visuals and sounds are generated in code.
+The level configuration is loaded before `game.js` by `index.html`. Visuals and
+sounds are still generated in code, with the asset folders providing a clear
+home for future level- or menu-specific resources.
 
 ## Build, Test, and Development Commands
 

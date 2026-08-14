@@ -62,7 +62,18 @@ PizzaDashWebDeluxe/
 ├── index.html
 ├── styles.css
 ├── game.js
+├── assets/
+│   ├── menu/
+│   └── levels/
+│       ├── level-1/config.js
+│       ├── level-2/config.js
+│       └── level-3/config.js
 ├── start.command
 ├── start.bat
+├── AGENTS.md
 └── README.md
 ```
+
+La configuración de cada nivel está separada en `assets/levels/level-N/`.
+Los elementos del menú están en `index.html` y `styles.css`; la carpeta
+`assets/menu/` está reservada para futuros recursos específicos del menú.

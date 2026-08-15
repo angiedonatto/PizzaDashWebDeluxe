@@ -108,7 +108,8 @@ LEVELS.push({
   const particles = [];
   const floatTexts = [];
   const MAX_PIZZAS = 2;
-  const PIZZERIA = { x: 12, y: 527, w: 205, h: 122, refillX: 114, refillY: 585, radius: 88 };
+  const PIZZERIA = { x: 34, y: 556, w: 136, h: 82, refillX: 102, refillY: 648, radius: 58 };
+  const RIVAL_PIZZERIA = { x: 1102, y: 552, w: 144, h: 86, refillX: 1174, refillY: 660, radius: 54 };
 
   const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
   const lerp = (a, b, t) => a + (b - a) * t;
@@ -262,7 +263,16 @@ LEVELS.push({
           { x: 548, y: 0, w: 170, h: H, axis: "y" }
         ];
 
-    const houses = theme === "park"
+    const houses = theme === "night"
+      ? [
+          makeHouse(82, 92, 154, 104, "#54506f", "#3f6583", 159, 216),
+          makeHouse(345, 88, 158, 106, "#4c4b69", "#65456f", 424, 214),
+          makeHouse(790, 88, 158, 106, "#54506f", "#3f6583", 869, 214),
+          makeHouse(1030, 96, 154, 102, "#4c4b69", "#65456f", 1107, 218),
+          makeHouse(236, 498, 160, 108, "#54506f", "#3f6583", 316, 626),
+          makeHouse(760, 500, 166, 108, "#4c4b69", "#65456f", 843, 628)
+        ]
+      : theme === "park"
       ? [
           makeHouse(80, 72, 210, 136, "#f1c17a", "#cf4f41", 180, 222),
           makeHouse(955, 75, 220, 142, "#f3dfae", "#4c7bad", 1060, 232),
@@ -280,21 +290,26 @@ LEVELS.push({
           makeHouse(1002, 490, 205, 136, "#f3ca91", "#d35d4c", 1104, 476)
         ];
 
-    if (theme === "night") {
-      houses.forEach((house, i) => {
-        house.wall = i % 2 ? "#4c4b69" : "#54506f";
-        house.roof = i % 2 ? "#65456f" : "#3f6583";
-        house.night = true;
-      });
-    }
+    if (theme === "night") houses.forEach(house => house.night = true);
 
     const obstacles = houses.flatMap(makeHouseObstacles);
+    if (theme === "night") {
+      obstacles.push(
+        { x: PIZZERIA.x + 8, y: PIZZERIA.y + 8, w: PIZZERIA.w - 16, h: PIZZERIA.h - 6, type: "pizzeria" },
+        { x: RIVAL_PIZZERIA.x + 8, y: RIVAL_PIZZERIA.y + 8, w: RIVAL_PIZZERIA.w - 16, h: RIVAL_PIZZERIA.h - 6, type: "rivalPizzeria" }
+      );
+    }
     const trees = [];
     const benches = [];
     const puddles = [];
     const cats = [];
 
-    const treeSpots = theme === "park"
+    const treeSpots = theme === "night"
+      ? [
+          [286, 110], [532, 118], [742, 116], [1210, 156],
+          [196, 470], [456, 560], [986, 500], [1210, 486]
+        ]
+      : theme === "park"
       ? [
           [330, 90], [410, 160], [790, 80], [865, 170],
           [360, 365], [840, 365], [325, 570], [900, 590],
@@ -308,7 +323,13 @@ LEVELS.push({
     treeSpots.forEach(([x, y], index) => {
       const tree = { x, y, r: 26 + (index % 3) * 3, phase: rand(0, Math.PI * 2) };
       trees.push(tree);
-      obstacles.push({ x: x - 18, y: y - 10, w: 36, h: 40, type: "tree" });
+      obstacles.push({
+        x: x - 13,
+        y: y + 6,
+        w: 26,
+        h: 42,
+        type: "tree"
+      });
     });
 
     if (theme === "park") {
@@ -319,29 +340,24 @@ LEVELS.push({
       puddles.push({ x: 790, y: 420, rx: 46, ry: 20 });
       cats.push(makeCat(420, 555, 72, "x"));
       cats.push(makeCat(820, 120, 66, "y"));
+    } else if (theme === "night") {
+      puddles.push(
+        { x: 210, y: 452, rx: 34, ry: 13 },
+        { x: 870, y: 258, rx: 40, ry: 16 },
+        { x: 1040, y: 452, rx: 36, ry: 14 }
+      );
+      cats.push(makeCat(454, 466, 70, "x"));
     } else {
       puddles.push({ x: 815, y: 455, rx: 42, ry: 17 });
       cats.push(makeCat(330, 448, 58, "x"));
     }
 
-    if (theme === "night") {
-      puddles.push(
-        { x: 210, y: 448, rx: 46, ry: 18 },
-        { x: 870, y: 260, rx: 50, ry: 20 },
-        { x: 1090, y: 452, rx: 44, ry: 18 }
-      );
-    }
-
     const cars = createTraffic(roads, levelIndex);
 
-    const coins = [
-      { x: 330, y: 245, taken: false, phase: rand(0, 6.2) },
-      { x: 950, y: 250, taken: false, phase: rand(0, 6.2) },
-      { x: 330, y: 460, taken: false, phase: rand(0, 6.2) },
-      { x: 950, y: 460, taken: false, phase: rand(0, 6.2) },
-      { x: 630, y: 250, taken: false, phase: rand(0, 6.2) },
-      { x: 630, y: 470, taken: false, phase: rand(0, 6.2) }
-    ];
+    const coinSpots = theme === "night"
+      ? [[284, 244], [1002, 248], [204, 462], [1036, 462], [636, 248], [636, 470]]
+      : [[330, 245], [950, 250], [330, 460], [950, 460], [630, 250], [630, 470]];
+    const coins = coinSpots.map(([x, y]) => ({ x, y, taken: false, phase: rand(0, 6.2) }));
 
     const flowerSeed = [];
     for (let i = 0; i < 90; i++) {
@@ -354,7 +370,9 @@ LEVELS.push({
 
     const crosswalks = createCrosswalks(roads);
 
-    return { roads, houses, obstacles, trees, benches, puddles, cats, cars, coins, flowerSeed, crosswalks, lightning: [] };
+    const intersections = createIntersections(roads);
+
+    return { roads, houses, obstacles, trees, benches, puddles, cats, cars, coins, flowerSeed, crosswalks, intersections, lightning: [] };
   }
 
   function makeHouse(x, y, w, h, wall, roof, doorX, doorY) {
@@ -362,20 +380,139 @@ LEVELS.push({
   }
 
   function makeHouseObstacles(house) {
+    const roof = {
+      x: house.x - 18,
+      y: house.y - 50,
+      w: house.w + 36,
+      h: 88,
+      type: "roof"
+    };
     const body = {
-      x: house.x + 16,
-      y: house.y + 24,
-      w: house.w - 32,
-      h: Math.max(48, house.h - 78),
+      x: house.x + 5,
+      y: house.y + 8,
+      w: house.w - 10,
+      h: Math.max(72, house.h - 8),
       type: "house"
     };
     const leftShrub = { x: house.x + 2, y: house.y + house.h - 24, w: 34, h: 30, type: "yard" };
     const rightShrub = { x: house.x + house.w - 36, y: house.y + house.h - 24, w: 34, h: 30, type: "yard" };
-    return [body, leftShrub, rightShrub];
+    return [roof, body, leftShrub, rightShrub];
   }
 
   function makeCar(x, y, w, h, dx, dy, color, speed, lane) {
-    return { x, y, w, h, dx, dy, color, speed, lane, hornCooldown: rand(1.5, 4) };
+    return { id: "", x, y, w, h, dx, dy, color, speed, lane, hornCooldown: rand(1.5, 4), waiting: false, waitTimer: 0 };
+  }
+
+  function carRectAt(car, x = car.x, y = car.y, pad = 0) {
+    return { x: x - pad, y: y - pad, w: car.w + pad * 2, h: car.h + pad * 2 };
+  }
+
+  function sameTrafficLane(a, b) {
+    if (!a.lane || !b.lane || a.lane.axis !== b.lane.axis || a.lane.road !== b.lane.road) return false;
+    if (a.dx !== b.dx || a.dy !== b.dy) return false;
+    return a.lane.axis === "x"
+      ? Math.abs(a.y - b.y) < 12
+      : Math.abs(a.x - b.x) < 12;
+  }
+
+  function getTrafficProgress(car) {
+    if (car.lane?.axis === "x") return car.dx > 0 ? car.x : W - car.x;
+    return car.dy > 0 ? car.y : H - car.y;
+  }
+
+  function setTrafficProgress(car, progress) {
+    if (car.lane?.axis === "x") {
+      car.x = car.dx > 0 ? progress : W - progress;
+    } else {
+      car.y = car.dy > 0 ? progress : H - progress;
+    }
+  }
+
+  function enforceTrafficSpacing() {
+    const minGap = 150;
+    const groups = [];
+    for (const car of world.cars) {
+      let group = groups.find(items => items.some(other => sameTrafficLane(car, other)));
+      if (!group) {
+        group = [];
+        groups.push(group);
+      }
+      group.push(car);
+    }
+
+    for (const group of groups) {
+      if (group.length < 2) continue;
+      group.sort((a, b) => getTrafficProgress(b) - getTrafficProgress(a));
+      for (let i = 1; i < group.length; i++) {
+        const ahead = group[i - 1];
+        const follower = group[i];
+        const gap = getTrafficProgress(ahead) - getTrafficProgress(follower);
+        if (gap < minGap) {
+          setTrafficProgress(follower, getTrafficProgress(ahead) - minGap);
+        }
+      }
+    }
+  }
+
+  function createIntersections(roads) {
+    const horizontal = roads.find(road => road.axis === "x");
+    const vertical = roads.find(road => road.axis === "y");
+    if (!horizontal || !vertical) return [];
+    return [{
+      x: vertical.x - 18,
+      y: horizontal.y - 18,
+      w: vertical.w + 36,
+      h: horizontal.h + 36,
+      reservedBy: null,
+      reservedAxis: null
+    }];
+  }
+
+  function reserveIntersection(intersection, car) {
+    intersection.reservedBy = car.id;
+    intersection.reservedAxis = car.lane?.axis || null;
+  }
+
+  function updateIntersectionReservations() {
+    if (!world.intersections?.length) return;
+    for (const intersection of world.intersections) {
+      const inside = world.cars.filter(car => rectsOverlap(carRectAt(car, car.x, car.y, 12), intersection));
+      const owner = inside.find(car => car.id === intersection.reservedBy);
+      if (owner) continue;
+      intersection.reservedBy = null;
+      intersection.reservedAxis = null;
+      if (inside.length) reserveIntersection(intersection, inside[0]);
+    }
+  }
+
+  function canEnterIntersection(car, nextX, nextY) {
+    if (!world.intersections?.length) return true;
+    for (const intersection of world.intersections) {
+      const currentRect = carRectAt(car, car.x, car.y, 10);
+      const nextRect = carRectAt(car, nextX, nextY, 10);
+      const inNow = rectsOverlap(currentRect, intersection);
+      const inNext = rectsOverlap(nextRect, intersection);
+      if (!inNext) continue;
+      if (inNow) {
+        if (!intersection.reservedBy) reserveIntersection(intersection, car);
+        continue;
+      }
+      if (!intersection.reservedBy || intersection.reservedBy === car.id) {
+        reserveIntersection(intersection, car);
+        continue;
+      }
+      const directConflict = world.cars.some(other => {
+        if (other === car || other.lane?.axis === car.lane?.axis) return false;
+        return rectsOverlap(carRectAt(car, nextX, nextY, 10), carRectAt(other, other.x, other.y, 10));
+      });
+      const crossingBlocker = world.cars.some(other => {
+        if (other === car || other.lane?.axis === car.lane?.axis) return false;
+        return rectsOverlap(carRectAt(other, other.x, other.y, 16), intersection);
+      });
+      if (directConflict || crossingBlocker || car.waitTimer < 1.15) return false;
+      reserveIntersection(intersection, car);
+    }
+    return true;
   }
 
   function createTraffic(roads, levelIndex) {
@@ -424,6 +561,7 @@ LEVELS.push({
       }
     }
 
+    cars.forEach((car, index) => car.id = `level-${levelIndex}-car-${index}`);
     return cars;
   }
 
@@ -489,9 +627,12 @@ LEVELS.push({
 
   function createRival(index) {
     if (LEVELS[index].mode === "solo") return null;
+    const nightStart = index === 2
+      ? { x: RIVAL_PIZZERIA.refillX, y: RIVAL_PIZZERIA.refillY }
+      : null;
     return {
-      x: W - 118,
-      y: LEVELS[index].theme === "park" ? 585 : 360,
+      x: nightStart ? nightStart.x : W - 118,
+      y: nightStart ? nightStart.y : LEVELS[index].theme === "park" ? 585 : 360,
       r: 18,
       speed: index === 2 ? 178 : 158,
       target: 1,
@@ -500,7 +641,9 @@ LEVELS.push({
       color: index === 2 ? "#65d9ff" : "#7d4ab5",
       facing: "left",
       moving: false,
-      dash: 0
+      dash: 0,
+      reloaded: true,
+      stuckTimer: 0
     };
   }
 
@@ -597,6 +740,38 @@ LEVELS.push({
     }
   }
 
+  function placeCircleAtSafePoint(circle, candidates) {
+    for (const point of candidates) {
+      const probe = { x: point.x, y: point.y, r: circle.r };
+      if (!world.obstacles.some(o => circleRectCollision(probe, o))) {
+        circle.x = point.x;
+        circle.y = point.y;
+        return true;
+      }
+    }
+    return false;
+  }
+
+  function recoverRivalIfStuck(dt, previousX, previousY, target) {
+    if (!rival?.moving) {
+      rival.stuckTimer = 0;
+      return;
+    }
+    const progress = Math.hypot(rival.x - previousX, rival.y - previousY);
+    rival.stuckTimer = progress < 1 ? rival.stuckTimer + dt : 0;
+    if (rival.stuckTimer < 1.6) return;
+    const candidates = [
+      { x: target.x, y: target.y + 44 },
+      { x: RIVAL_PIZZERIA.refillX, y: RIVAL_PIZZERIA.refillY },
+      { x: W - 124, y: 360 },
+      { x: 1010, y: 460 },
+      { x: 1030, y: 250 }
+    ];
+    placeCircleAtSafePoint(rival, candidates);
+    rival.wait = .18;
+    rival.stuckTimer = 0;
+  }
+
   function update(dt) {
     animationClock += dt;
     rainOffset += dt * 280;
@@ -683,9 +858,19 @@ LEVELS.push({
   }
 
   function updateCars(dt) {
+    updateIntersectionReservations();
     for (const car of world.cars) {
-      car.x += car.dx * car.speed * dt;
-      car.y += car.dy * car.speed * dt;
+      const nextX = car.x + car.dx * car.speed * dt;
+      const nextY = car.y + car.dy * car.speed * dt;
+      if (canEnterIntersection(car, nextX, nextY)) {
+        car.x = nextX;
+        car.y = nextY;
+        car.waiting = false;
+        car.waitTimer = 0;
+      } else {
+        car.waiting = true;
+        car.waitTimer += dt;
+      }
       car.hornCooldown -= dt;
 
       if (car.lane?.axis === "x") {
@@ -698,10 +883,18 @@ LEVELS.push({
       if (car.dx < 0 && car.x < -150) car.x = W + 130 + rand(0, 220);
       if (car.dy > 0 && car.y > H + 140) car.y = -170 - rand(0, 220);
       if (car.dy < 0 && car.y < -170) car.y = H + 140 + rand(0, 220);
+    }
 
+    enforceTrafficSpacing();
+    updateIntersectionReservations();
+
+    for (const car of world.cars) {
       const hitbox = { x: car.x + 7, y: car.y + 7, w: car.w - 14, h: car.h - 14 };
       if (invulnerable <= 0 && circleRectCollision(player, hitbox)) {
         hitPlayer(car);
+      }
+      if (rival && circleRectCollision(rival, hitbox)) {
+        hitRival(car);
       }
     }
   }
@@ -710,10 +903,21 @@ LEVELS.push({
     for (const cat of world.cats) {
       if (cat.axis === "x") {
         cat.x += cat.dir * cat.speed * dt;
-        if (Math.abs(cat.x - cat.baseX) > cat.range) cat.dir *= -1;
+        if (Math.abs(cat.x - cat.baseX) > cat.range) {
+          cat.x = cat.baseX + Math.sign(cat.x - cat.baseX) * cat.range;
+          cat.dir *= -1;
+        }
       } else {
         cat.y += cat.dir * cat.speed * dt;
-        if (Math.abs(cat.y - cat.baseY) > cat.range) cat.dir *= -1;
+        if (Math.abs(cat.y - cat.baseY) > cat.range) {
+          cat.y = cat.baseY + Math.sign(cat.y - cat.baseY) * cat.range;
+          cat.dir *= -1;
+        }
+      }
+      if (world.obstacles.some(o => circleRectCollision({ x: cat.x, y: cat.y, r: 13 }, o))) {
+        cat.dir *= -1;
+        cat.x = cat.baseX;
+        cat.y = cat.baseY;
       }
       cat.phase += dt * 6;
 
@@ -723,6 +927,10 @@ LEVELS.push({
         timeLeft = Math.max(0, timeLeft - 1.5);
         spawnText(player.x, player.y - 28, "¡Miau!", "#5b3140");
         burst(player.x, player.y, "#f5c071", 7);
+      }
+      if (rival && Math.hypot(rival.x - cat.x, rival.y - cat.y) < rival.r + 13) {
+        rival.wait = Math.max(rival.wait, .55);
+        rival.dash = 0;
       }
     }
   }
@@ -741,6 +949,17 @@ LEVELS.push({
     spawnText(player.x, player.y - 34, "-4 s", "#ef4038");
     showToast("¡Cuidado con el tráfico!");
     sound("crash");
+  }
+
+  function hitRival(car) {
+    if (!rival || rival.wait > .4) return;
+    rival.wait = levelData.mode === "stormRace" ? 1.05 : .85;
+    rival.dash = 0;
+    rival.x = clamp(rival.x - car.dx * 58, rival.r + 8, W - rival.r - 8);
+    rival.y = clamp(rival.y - car.dy * 58, rival.r + 62, H - rival.r - 8);
+    resolveCircleObstacles(rival, 6);
+    burst(rival.x, rival.y, "#65d9ff", 10);
+    spawnText(rival.x, rival.y - 30, "RIVAL -", "#65d9ff");
   }
 
   function updateCoins() {
@@ -769,10 +988,35 @@ LEVELS.push({
 
   function updateRival(dt) {
     if (!rival || state !== "playing") return;
+    const previousX = rival.x;
+    const previousY = rival.y;
     rival.wait = Math.max(0, rival.wait - dt);
     rival.dash = Math.max(0, rival.dash - dt * 2);
     if (rival.wait > 0) {
       rival.moving = false;
+      return;
+    }
+
+    if (levelData.mode === "stormRace" && rival.delivered > 0 && rival.delivered % MAX_PIZZAS === 0 && !rival.reloaded) {
+      const reloadTarget = { x: RIVAL_PIZZERIA.refillX, y: RIVAL_PIZZERIA.refillY };
+      const backDx = reloadTarget.x - rival.x;
+      const backDy = reloadTarget.y - rival.y;
+      const backDistance = Math.hypot(backDx, backDy) || 1;
+      rival.moving = backDistance > 10;
+      rival.facing = backDx < 0 ? "left" : "right";
+      rival.x += (backDx / backDistance) * rival.speed * dt;
+      rival.y += (backDy / backDistance) * rival.speed * dt;
+      resolveCircleObstacles(rival, 5);
+      if (world.obstacles.some(o => o.type === "rivalPizzeria" && circleRectCollision(rival, o))) {
+        rival.x = reloadTarget.x;
+        rival.y = reloadTarget.y;
+      }
+      recoverRivalIfStuck(dt, previousX, previousY, reloadTarget);
+      if (backDistance < 28) {
+        rival.reloaded = true;
+        rival.wait = .35;
+        burst(RIVAL_PIZZERIA.refillX, RIVAL_PIZZERIA.refillY, rival.color, 10);
+      }
       return;
     }
 
@@ -787,6 +1031,7 @@ LEVELS.push({
     rival.x += (dx / d) * rival.speed * speedBoost * dt;
     rival.y += (dy / d) * rival.speed * speedBoost * dt;
     resolveCircleObstacles(rival, 4);
+    recoverRivalIfStuck(dt, previousX, previousY, target);
 
     if (d < 42) {
       rival.delivered += 1;
@@ -794,6 +1039,7 @@ LEVELS.push({
       rival.dash = 1;
       burst(target.x, target.y, rival.color, 12);
       spawnText(target.x, target.y - 30, "RIVAL +1", rival.color);
+      if (rival.delivered % MAX_PIZZAS !== 0) rival.reloaded = false;
       rival.target = findNextTarget(rival.target + 1);
       if (rival.delivered >= levelData.required) {
         showToast("El rival entregó primero");
@@ -833,6 +1079,11 @@ LEVELS.push({
           player.bump = 1;
           spawnText(player.x, player.y - 34, "-3 s", "#65d9ff");
           sound("crash");
+        }
+        if (rival && Math.hypot(rival.x - bolt.x, rival.y - bolt.y) < rival.r + bolt.r) {
+          rival.wait = Math.max(rival.wait, 1.15);
+          rival.dash = 0;
+          spawnText(rival.x, rival.y - 32, "RAYO", "#d6f3ff");
         }
       }
       if (bolt.life <= 0) world.lightning.splice(i, 1);
@@ -1032,6 +1283,7 @@ LEVELS.push({
     }
     if (rival) drawRival();
     if (player) drawPlayer();
+    if (world) drawTreeCanopiesOverActors();
     drawParticles();
     drawFloatTexts();
     if (levelData.theme === "night") drawNightOverlay();
@@ -1202,8 +1454,6 @@ LEVELS.push({
       drawLamp(970, 252);
       drawLamp(310, 468);
       drawLamp(970, 468);
-      drawNeonSign(420, 255, "ABIERTO", "#65d9ff");
-      drawNeonSign(850, 468, "HOT", "#ff6f9a");
     } else {
       drawLamp(310, 252);
       drawLamp(970, 252);
@@ -1214,6 +1464,7 @@ LEVELS.push({
     }
 
     drawPizzeria();
+    if (levelData.theme === "night") drawRivalPizzeria();
   }
 
   function drawYardSign(x, y, text) {
@@ -1228,21 +1479,6 @@ LEVELS.push({
     ctx.font = "900 15px Trebuchet MS";
     ctx.textAlign = "center";
     ctx.fillText(text, x, y - 9);
-  }
-
-  function drawNeonSign(x, y, text, color) {
-    ctx.save();
-    ctx.shadowColor = color;
-    ctx.shadowBlur = 16 + Math.sin(animationClock * 8) * 5;
-    ctx.strokeStyle = color;
-    ctx.lineWidth = 3;
-    fillRoundedRect(ctx, x - 58, y - 26, 116, 40, 8, "rgba(25,24,55,.78)");
-    ctx.strokeRect(x - 51, y - 20, 102, 28);
-    ctx.fillStyle = color;
-    ctx.font = "900 15px Trebuchet MS";
-    ctx.textAlign = "center";
-    ctx.fillText(text, x, y);
-    ctx.restore();
   }
 
   function drawLamp(x, y) {
@@ -1290,20 +1526,42 @@ LEVELS.push({
       ctx.restore();
     }
     ctx.fillStyle = "rgba(61,34,39,.16)";
-    fillRoundedRect(ctx, 8, 18, 208, 128, 16, "rgba(61,34,39,.18)");
-    fillRoundedRect(ctx, 0, 0, 205, 122, 14, levelData.theme === "night" ? "#4e4159" : "#f4d49e");
+    fillRoundedRect(ctx, 8, 16, PIZZERIA.w, PIZZERIA.h + 18, 14, "rgba(61,34,39,.18)");
+    fillRoundedRect(ctx, 0, 0, PIZZERIA.w, PIZZERIA.h, 12, levelData.theme === "night" ? "#4e4159" : "#f4d49e");
     ctx.fillStyle = "#d85045";
     ctx.beginPath();
-    ctx.moveTo(-10, 18);
-    ctx.lineTo(102, -34);
-    ctx.lineTo(215, 18);
+    ctx.moveTo(-8, 14);
+    ctx.lineTo(PIZZERIA.w / 2, -24);
+    ctx.lineTo(PIZZERIA.w + 8, 14);
     ctx.closePath();
     ctx.fill();
-    fillRoundedRect(ctx, 48, 55, 110, 42, 8, "#6c2e2e");
+    fillRoundedRect(ctx, 27, 38, 82, 31, 7, "#6c2e2e");
     ctx.fillStyle = "#ffd65a";
-    ctx.font = "900 24px Nunito";
+    ctx.font = "900 18px Nunito";
     ctx.textAlign = "center";
-    ctx.fillText("PIZZA", 103, 84);
+    ctx.fillText("PIZZA", PIZZERIA.w / 2, 60);
+    ctx.restore();
+  }
+
+  function drawRivalPizzeria() {
+    const x = RIVAL_PIZZERIA.x;
+    const y = RIVAL_PIZZERIA.y;
+    ctx.save();
+    ctx.translate(x, y);
+    fillRoundedRect(ctx, 8, 16, RIVAL_PIZZERIA.w, RIVAL_PIZZERIA.h + 18, 14, "rgba(18,22,45,.22)");
+    fillRoundedRect(ctx, 0, 0, RIVAL_PIZZERIA.w, RIVAL_PIZZERIA.h, 12, "#334968");
+    ctx.fillStyle = "#65d9ff";
+    ctx.beginPath();
+    ctx.moveTo(-8, 14);
+    ctx.lineTo(RIVAL_PIZZERIA.w / 2, -24);
+    ctx.lineTo(RIVAL_PIZZERIA.w + 8, 14);
+    ctx.closePath();
+    ctx.fill();
+    fillRoundedRect(ctx, 22, 38, 100, 31, 7, "#202757");
+    ctx.fillStyle = "#fff7d7";
+    ctx.font = "900 15px Nunito";
+    ctx.textAlign = "center";
+    ctx.fillText("PIZZA AZUL", RIVAL_PIZZERIA.w / 2, 59);
     ctx.restore();
   }
 
@@ -1375,7 +1633,7 @@ LEVELS.push({
       ctx.shadowBlur = 14;
       ctx.font = "900 12px Nunito";
       ctx.textAlign = "center";
-      ctx.fillText(index % 2 ? "CAFÉ" : "PIZZA", h.w / 2, 30);
+      ctx.fillText(index % 2 ? "PIZZA" : "PRIME", h.w / 2, 30);
       ctx.shadowBlur = 0;
     }
 
@@ -1402,19 +1660,41 @@ LEVELS.push({
       ctx.translate(tree.x + sway, tree.y);
       ctx.fillStyle = "#795036";
       fillRoundedRect(ctx, -6, 10, 12, 34, 4, "#795036");
+      drawTreeCanopy(tree);
+      ctx.restore();
+    }
+  }
 
-      const dark = levelData.theme === "night" ? "#24505a" : "#347e48";
-      const light = levelData.theme === "night" ? "#3b6b68" : "#50a557";
-      ctx.fillStyle = dark;
-      ctx.beginPath();
-      ctx.arc(-14, 1, tree.r * .66, 0, Math.PI * 2);
-      ctx.arc(13, -3, tree.r * .72, 0, Math.PI * 2);
-      ctx.arc(0, -17, tree.r * .8, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillStyle = light;
-      ctx.beginPath();
-      ctx.arc(-6, -14, tree.r * .45, 0, Math.PI * 2);
-      ctx.fill();
+  function drawTreeCanopy(tree) {
+    const dark = levelData.theme === "night" ? "#24505a" : "#347e48";
+    const light = levelData.theme === "night" ? "#3b6b68" : "#50a557";
+    ctx.fillStyle = dark;
+    ctx.beginPath();
+    ctx.arc(-14, 1, tree.r * .66, 0, Math.PI * 2);
+    ctx.arc(13, -3, tree.r * .72, 0, Math.PI * 2);
+    ctx.arc(0, -17, tree.r * .8, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = light;
+    ctx.beginPath();
+    ctx.arc(-6, -14, tree.r * .45, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  function actorBehindTree(actor, tree) {
+    if (!actor) return false;
+    return Math.abs(actor.x - tree.x) < tree.r + actor.r + 8 &&
+      actor.y < tree.y + 30 &&
+      actor.y > tree.y - tree.r - 42;
+  }
+
+  function drawTreeCanopiesOverActors() {
+    for (const tree of world.trees) {
+      if (!actorBehindTree(player, tree) && !actorBehindTree(rival, tree)) continue;
+      const sway = Math.sin(tree.phase) * 1.5;
+      ctx.save();
+      ctx.globalAlpha = .96;
+      ctx.translate(tree.x + sway, tree.y);
+      drawTreeCanopy(tree);
       ctx.restore();
     }
   }
@@ -1859,22 +2139,57 @@ LEVELS.push({
   }
 
   function drawNightOverlay() {
-    ctx.fillStyle = "rgba(22,22,59,.18)";
+    ctx.fillStyle = "rgba(22,22,59,.16)";
     ctx.fillRect(0, 0, W, H);
 
-    for (let i = -20; i < W + 40; i += 38) {
-      const x = i + (rainOffset % 38);
-      ctx.strokeStyle = "rgba(173,214,255,.28)";
-      ctx.lineWidth = 2;
+    const mist = ctx.createLinearGradient(0, 0, 0, H);
+    mist.addColorStop(0, "rgba(170,205,235,.08)");
+    mist.addColorStop(.55, "rgba(170,205,235,.035)");
+    mist.addColorStop(1, "rgba(170,205,235,.09)");
+    ctx.fillStyle = mist;
+    ctx.fillRect(0, 0, W, H);
+
+    ctx.lineCap = "round";
+    const layers = [
+      { count: 115, spacingX: 67, spacingY: 131, speed: .78, len: 18, alpha: .13, width: .85, wind: .22 },
+      { count: 78, spacingX: 83, spacingY: 109, speed: 1.04, len: 28, alpha: .22, width: 1.25, wind: .3 },
+      { count: 34, spacingX: 127, spacingY: 151, speed: 1.36, len: 38, alpha: .34, width: 1.7, wind: .36 }
+    ];
+    layers.forEach((layer, layerIndex) => {
+      for (let i = 0; i < layer.count; i++) {
+        const seed = i + layerIndex * 97;
+        const column = (seed * layer.spacingX) % (W + 180);
+        const row = (seed * layer.spacingY) % (H + 140);
+        const drift = (rainOffset * layer.speed + seed * 17) % (H + 140);
+        const variation = ((seed * 37) % 19) / 19;
+        const x = column - 90 - drift * layer.wind + Math.sin(animationClock * 2.4 + seed) * 3.5;
+        const y = row - 90 + drift;
+        const length = layer.len + variation * 15;
+        const slant = length * (.24 + variation * .14);
+        ctx.strokeStyle = `rgba(205,232,255,${layer.alpha + variation * .06})`;
+        ctx.lineWidth = layer.width;
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+        ctx.lineTo(x - slant, y + length);
+        ctx.stroke();
+      }
+    });
+
+    ctx.strokeStyle = "rgba(214,238,255,.2)";
+    ctx.lineWidth = 1;
+    for (let i = 0; i < 42; i++) {
+      const x = (i * 97 + rainOffset * .9) % W;
+      const y = 448 + ((i * 43 + rainOffset * .22) % 230);
       ctx.beginPath();
-      ctx.moveTo(x, 0);
-      ctx.lineTo(x - 22, H);
+      ctx.ellipse(x, y, 7 + (i % 3) * 2, 2.2, -.15, 0, Math.PI * 2);
       ctx.stroke();
     }
 
+    ctx.lineCap = "butt";
+
     const vignette = ctx.createRadialGradient(W / 2, H / 2, 220, W / 2, H / 2, 760);
     vignette.addColorStop(0, "rgba(0,0,0,0)");
-    vignette.addColorStop(1, "rgba(5,8,28,.42)");
+    vignette.addColorStop(1, "rgba(5,8,28,.34)");
     ctx.fillStyle = vignette;
     ctx.fillRect(0, 0, W, H);
   }

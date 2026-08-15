@@ -1,5 +1,46 @@
+const LEVELS = [{
+  name: "Barrio Soleado",
+  duration: 95,
+  required: 3,
+  traffic: 105,
+  theme: "neighborhood",
+  mode: "solo",
+  sky: "#8ed8ff",
+  grass: "#86c968",
+  road: "#6c7480",
+  accent: "#ef5a43",
+  start: { x: 632, y: 360 }
+}];
+LEVELS.push({
+  name: "Parque Central",
+  duration: 105,
+  required: 4,
+  traffic: 125,
+  theme: "park",
+  mode: "race",
+  sky: "#a6e4ff",
+  grass: "#75bd65",
+  road: "#7c786f",
+  accent: "#3e9b5f",
+  start: { x: 600, y: 580 }
+});
+LEVELS.push({
+  name: "Ciudad Nocturna",
+  duration: 115,
+  required: 5,
+  traffic: 155,
+  theme: "night",
+  mode: "stormRace",
+  sky: "#202757",
+  grass: "#334b52",
+  road: "#3f4659",
+  accent: "#8d5fd3",
+  start: { x: 632, y: 360 }
+});
 (() => {
   "use strict";
+
+  const LEVEL_URLS = ["../level-1/", "../level-2/", "../level-3/"];
 
   const canvas = document.getElementById("gameCanvas");
   const ctx = canvas.getContext("2d");
@@ -12,7 +53,6 @@
     how: document.getElementById("howScreen"),
     pause: document.getElementById("pauseScreen"),
     result: document.getElementById("resultScreen"),
-    shop: document.getElementById("shopScreen"),
     hud: document.getElementById("hud"),
     toast: document.getElementById("toast"),
     pauseBtn: document.getElementById("pauseBtn"),
@@ -34,12 +74,7 @@
     resultDeliveries: document.getElementById("resultDeliveries"),
     nextBtn: document.getElementById("nextBtn"),
     retryBtn: document.getElementById("retryBtn"),
-    resultMenuBtn: document.getElementById("resultMenuBtn"),
-    shopBtn: document.getElementById("shopBtn"),
-    closeShopBtn: document.getElementById("closeShopBtn"),
-    speedUpgradeBtn: document.getElementById("speedUpgradeBtn"),
-    capacityUpgradeBtn: document.getElementById("capacityUpgradeBtn"),
-    healthUpgradeBtn: document.getElementById("healthUpgradeBtn")
+    resultMenuBtn: document.getElementById("resultMenuBtn")
   };
 
   const keys = new Set();
@@ -70,15 +105,9 @@
   let levelIntroTimer = 0;
   let rival = null;
   let stormTimer = 0;
-  let transitionStartedAt = 0;
-  let shopSelection = 0;
   const particles = [];
   const floatTexts = [];
   const MAX_PIZZAS = 2;
-  const SHOP_COSTS = { speed: 300, capacity: 400, health: 500 };
-  const getUpgrades = () => JSON.parse(localStorage.getItem("pizzaDashUpgrades") || '{"speed":0,"capacity":0,"health":0}');
-  const maxPizzas = () => MAX_PIZZAS + getUpgrades().capacity;
-  const maxHearts = () => 3 + getUpgrades().health;
   const PIZZERIA = { x: 12, y: 527, w: 205, h: 122, refillX: 114, refillY: 585, radius: 88 };
 
   const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
@@ -173,7 +202,7 @@
   }
 
   function showOnly(screen) {
-    [el.menu, el.level, el.how, el.pause, el.result, el.shop].forEach(node => node.classList.add("hidden"));
+    [el.menu, el.level, el.how, el.pause, el.result].forEach(node => node.classList.add("hidden"));
     if (screen) screen.classList.remove("hidden");
   }
 
@@ -241,13 +270,14 @@
           makeHouse(950, 350, 220, 135, "#f5cf92", "#5e9c79", 1060, 500)
         ]
       : [
-          makeHouse(75, 68, 215, 138, "#f6d9a4", "#d74f42", 182, 214),
-          makeHouse(350, 68, 170, 130, "#efc58e", "#4e7fa7", 435, 206),
-          makeHouse(760, 62, 190, 138, "#f7dfb0", "#c95852", 855, 214),
-          makeHouse(1000, 70, 205, 135, "#efc897", "#668f69", 1103, 213),
-          makeHouse(355, 496, 170, 132, "#f0bf8d", "#ce6541", 440, 636),
-          makeHouse(760, 492, 190, 138, "#f4ddb0", "#7a65a7", 855, 638),
-          makeHouse(1002, 490, 205, 136, "#f3ca91", "#d35d4c", 1104, 634)
+          makeHouse(75, 68, 215, 138, "#f6d9a4", "#d74f42", 182, 228),
+          makeHouse(350, 68, 170, 130, "#efc58e", "#4e7fa7", 435, 221),
+          makeHouse(760, 62, 190, 138, "#f7dfb0", "#c95852", 855, 225),
+          makeHouse(1000, 70, 205, 135, "#efc897", "#668f69", 1103, 225),
+          makeHouse(74, 486, 215, 140, "#f4d49f", "#548db3", 182, 472),
+          makeHouse(355, 496, 170, 132, "#f0bf8d", "#ce6541", 440, 482),
+          makeHouse(760, 492, 190, 138, "#f4ddb0", "#7a65a7", 855, 477),
+          makeHouse(1002, 490, 205, 136, "#f3ca91", "#d35d4c", 1104, 476)
         ];
 
     if (theme === "night") {
@@ -258,11 +288,7 @@
       });
     }
 
-    const shop = theme === "park"
-      ? { x: 705, y: 350, w: 145, h: 112, doorX: 777, doorY: 474 }
-      : { x: 540, y: 470, w: 145, h: 112, doorX: 612, doorY: 594 };
     const obstacles = houses.flatMap(makeHouseObstacles);
-    obstacles.push({ x: shop.x + 12, y: shop.y + 28, w: shop.w - 24, h: shop.h - 28, type: "shop" });
     const trees = [];
     const benches = [];
     const puddles = [];
@@ -328,7 +354,7 @@
 
     const crosswalks = createCrosswalks(roads);
 
-    return { roads, houses, shop, obstacles, trees, benches, puddles, cats, cars, coins, flowerSeed, crosswalks, lightning: [] };
+    return { roads, houses, obstacles, trees, benches, puddles, cats, cars, coins, flowerSeed, crosswalks, lightning: [] };
   }
 
   function makeHouse(x, y, w, h, wall, roof, doorX, doorY) {
@@ -429,7 +455,7 @@
       x: levelData.start.x,
       y: levelData.start.y,
       r: 20,
-      speed: 215 + getUpgrades().speed * 25,
+      speed: 215,
       facing: "right",
       moving: false,
       bump: 0,
@@ -442,8 +468,8 @@
     timeLeft = levelData.duration;
     delivered = 0;
     score = 0;
-    hearts = maxHearts();
-    pizzasCarried = maxPizzas();
+    hearts = 3;
+    pizzasCarried = MAX_PIZZAS;
     currentTarget = 0;
     invulnerable = 0;
     actionCooldown = 0;
@@ -616,21 +642,6 @@
     if (yAxis > 0 && Math.abs(yAxis) > Math.abs(xAxis)) player.facing = "down";
 
     movePlayer(xAxis * speed * dt, yAxis * speed * dt);
-    const exitRoad = world.roads.some(road => road.axis === "x"
-      && player.x >= W - player.r - 10
-      && player.y > road.y + 18
-      && player.y < road.y + road.h - 18);
-    if (delivered >= levelData.required && exitRoad) {
-      if (activeLevel < LEVELS.length - 1) {
-        state = "transitioning";
-        transitionStartedAt = performance.now();
-        showToast(`Saliendo hacia ${LEVELS[activeLevel + 1].name}…`);
-        setTimeout(() => beginLevel(activeLevel + 1), 650);
-      } else {
-        finishLevel(true);
-      }
-      return;
-    }
     if (player.moving && sprinting) {
       player.trailTimer -= dt;
       if (player.trailTimer <= 0) {
@@ -745,20 +756,13 @@
   }
 
   function updatePizzeriaRefill() {
-    if (pizzasCarried >= maxPizzas()) return;
+    if (pizzasCarried >= MAX_PIZZAS) return;
     const nearPizzeria = Math.hypot(player.x - PIZZERIA.refillX, player.y - PIZZERIA.refillY) < PIZZERIA.radius;
     if (!nearPizzeria) return;
-    const pizzasToBuy = maxPizzas() - pizzasCarried;
-    const pizzaCost = (levelData.pizzaCost || 0) * pizzasToBuy;
-    if (score < pizzaCost) {
-      showToast(`Necesitas ${pizzaCost} monedas para comprar ${pizzasToBuy} pizza${pizzasToBuy === 1 ? "" : "s"}`);
-      return;
-    }
-    score -= pizzaCost;
-    pizzasCarried = maxPizzas();
+    pizzasCarried = MAX_PIZZAS;
     burst(PIZZERIA.refillX, PIZZERIA.refillY, "#ffd25d", 18);
-    spawnText(PIZZERIA.refillX, PIZZERIA.refillY - 38, `-${pizzaCost} 🪙`, "#f2a82f");
-    showToast(`Compraste ${pizzasToBuy} pizza${pizzasToBuy === 1 ? "" : "s"} por ${pizzaCost} monedas`);
+    spawnText(PIZZERIA.refillX, PIZZERIA.refillY - 38, "RECARGA x2", "#f2a82f");
+    showToast("Mochila recargada: 2 pizzas");
     sound("coin");
     updateHud();
   }
@@ -870,7 +874,12 @@
     showToast(comboBonus ? `¡Pizza entregada! Combo +${comboBonus}` : "¡Pizza entregada! +200");
     sound("deliver");
 
-    if (delivered < levelData.required) currentTarget = findNextTarget(currentTarget);
+    if (delivered >= levelData.required) {
+      setTimeout(() => finishLevel(true), 520);
+      return;
+    }
+
+    currentTarget = findNextTarget(currentTarget);
     updateHud();
   }
 
@@ -900,12 +909,26 @@
       localStorage.setItem(`pizzaDashStars${activeLevel}`, String(Math.max(previous, stars)));
       el.resultIcon.textContent = "🏆";
       el.resultEyebrow.textContent = "MISIÓN COMPLETA";
-      el.resultTitle.textContent = stars === 3 ? "¡Entrega perfecta!" : "¡Buen trabajo!";
-      el.resultMessage.textContent = `${levelData.name} ya tiene la cena lista.`;
+      const hasNextLevel = activeLevel < LEVELS.length - 1;
+      el.resultTitle.textContent = hasNextLevel ? "¡Ruta completada!" : (stars === 3 ? "¡Entrega perfecta!" : "¡Buen trabajo!");
+      el.resultMessage.textContent = hasNextLevel
+        ? `Siguiente parada: ${LEVELS[activeLevel + 1].name}`
+        : `${levelData.name} ya tiene la cena lista.`;
       el.resultStars.textContent = `${"★ ".repeat(stars)}${"☆ ".repeat(3 - stars)}`.trim();
       el.nextBtn.classList.add("hidden");
-      el.retryBtn.classList.remove("hidden");
-      el.resultMenuBtn.classList.remove("hidden");
+      el.retryBtn.classList.toggle("hidden", hasNextLevel);
+      el.resultMenuBtn.classList.toggle("hidden", hasNextLevel);
+      if (hasNextLevel) {
+        showToast(`¡Nivel ${activeLevel + 1} listo! Avanzando...`);
+        autoAdvanceTimer = setTimeout(() => {
+          const nextUrl = LEVEL_URLS[activeLevel + 1];
+          if (nextUrl) {
+            window.location.href = nextUrl;
+            return;
+          }
+          beginLevel(activeLevel + 1);
+        }, 1450);
+      }
       sound("win");
     } else {
       el.resultIcon.textContent = "🍕";
@@ -927,9 +950,9 @@
   function updateHud() {
     el.hudLevel.textContent = String(activeLevel + 1);
     el.hudTime.textContent = formatTime(timeLeft);
-    el.hudDeliveries.textContent = `${pizzasCarried}/${maxPizzas()} · ${delivered}/${levelData.required}`;
+    el.hudDeliveries.textContent = `${pizzasCarried}/${MAX_PIZZAS} · ${delivered}/${levelData.required}`;
     el.hudScore.textContent = String(score);
-    el.hudHearts.textContent = `${"♥ ".repeat(hearts)}${"♡ ".repeat(Math.max(0, maxHearts() - hearts))}`.trim();
+    el.hudHearts.textContent = `${"♥ ".repeat(hearts)}${"♡ ".repeat(3 - hearts)}`.trim();
     el.missionText.textContent = delivered >= levelData.required
       ? "¡Todas las pizzas fueron entregadas!"
       : pizzasCarried <= 0
@@ -999,7 +1022,6 @@
       drawTerrainDetails();
       drawPuddles();
       drawHouses();
-      drawShopBuilding();
       drawTrees();
       drawBenches();
       drawCoins();
@@ -1016,11 +1038,6 @@
 
     ctx.restore();
     drawLevelBanner();
-    if (state === "transitioning") {
-      const progress = clamp((performance.now() - transitionStartedAt) / 650, 0, 1);
-      ctx.fillStyle = `rgba(24,14,30,${progress * .92})`;
-      ctx.fillRect(0, 0, W, H);
-    }
   }
 
   function drawLevelBanner() {
@@ -1254,7 +1271,7 @@
     const y = PIZZERIA.y;
     ctx.save();
     ctx.translate(x, y);
-    if (state === "playing" && pizzasCarried < maxPizzas()) {
+    if (state === "playing" && pizzasCarried < MAX_PIZZAS) {
       ctx.save();
       ctx.translate(PIZZERIA.refillX - x, PIZZERIA.refillY - y);
       const pulse = 1 + Math.sin(animationClock * 6) * .08;
@@ -1274,64 +1291,19 @@
     }
     ctx.fillStyle = "rgba(61,34,39,.16)";
     fillRoundedRect(ctx, 8, 18, 208, 128, 16, "rgba(61,34,39,.18)");
-    fillRoundedRect(ctx, 0, 0, 205, 122, 14, "#f2c27f");
-    ctx.fillStyle = "#b85b3d";
-    for (let row = 0; row < 5; row++) {
-      for (let column = 0; column < 7; column++) {
-        fillRoundedRect(ctx, 7 + column * 29 + (row % 2) * 7, 8 + row * 16, 23, 11, 3, "#d47750");
-      }
-    }
-    fillRoundedRect(ctx, 22, 34, 161, 31, 8, "#fff2c9");
-    ctx.fillStyle = "#b92f32";
-    ctx.font = "900 22px Nunito";
-    ctx.textAlign = "center";
-    ctx.fillText("🍕 PIZZERÍA", 103, 57);
-    fillRoundedRect(ctx, 26, 69, 63, 47, 6, "#79c6d2");
-    ctx.strokeStyle = "#fff4cf";
-    ctx.lineWidth = 4;
-    ctx.strokeRect(31, 74, 53, 37);
-    fillRoundedRect(ctx, 99, 77, 48, 45, 5, "#713c35");
-    ctx.fillStyle = "#ffbd54";
+    fillRoundedRect(ctx, 0, 0, 205, 122, 14, levelData.theme === "night" ? "#4e4159" : "#f4d49e");
+    ctx.fillStyle = "#d85045";
     ctx.beginPath();
-    ctx.arc(123, 101, 13, 0, Math.PI * 2);
+    ctx.moveTo(-10, 18);
+    ctx.lineTo(102, -34);
+    ctx.lineTo(215, 18);
+    ctx.closePath();
     ctx.fill();
-    fillRoundedRect(ctx, 154, 79, 30, 43, 5, "#5a3635");
+    fillRoundedRect(ctx, 48, 55, 110, 42, 8, "#6c2e2e");
     ctx.fillStyle = "#ffd65a";
-    ctx.font = "900 13px Nunito";
-    ctx.fillText("PIZZA", 103, 140);
-    ctx.restore();
-  }
-
-  function drawShopBuilding() {
-    if (!world?.shop) return;
-    const shop = world.shop;
-    ctx.save();
-    ctx.translate(shop.x, shop.y);
-    fillRoundedRect(ctx, 7, 14, shop.w, shop.h, 12, "rgba(61,34,39,.2)");
-    fillRoundedRect(ctx, 0, 0, shop.w, shop.h, 10, "#8e5c9d");
-    ctx.fillStyle = "#e6a84f";
-    ctx.fillRect(-8, 0, shop.w + 16, 27);
-    ctx.fillStyle = "#fff1b1";
-    ctx.font = "900 18px Nunito";
+    ctx.font = "900 24px Nunito";
     ctx.textAlign = "center";
-    ctx.fillText("MEJORAS", shop.w / 2, 20);
-    fillRoundedRect(ctx, 16, 39, 62, 48, 5, "#68c4cf");
-    fillRoundedRect(ctx, 85, 50, 42, 62, 5, "#4b2d3b");
-    ctx.fillStyle = "#ffd85f";
-    ctx.font = "22px sans-serif";
-    ctx.fillText("🛒", 47, 71);
-    ctx.font = "18px sans-serif";
-    ctx.fillText("⚡ ♥", 106, 79);
-    ctx.fillStyle = "#ffd85f";
-    ctx.font = "900 13px Nunito";
-    ctx.fillText("SHOP", shop.w / 2, shop.h - 8);
-    const near = player && Math.hypot(player.x - shop.doorX, player.y - shop.doorY) < 86;
-    if (near && state === "playing") {
-      fillRoundedRect(ctx, shop.doorX - 100, shop.doorY + 10 - shop.y, 200, 34, 10, "rgba(36,22,47,.9)");
-      ctx.fillStyle = "#fff";
-      ctx.font = "800 14px Nunito";
-      ctx.fillText("E / ESPACIO · ABRIR TIENDA", shop.doorX, shop.doorY + 32 - shop.y);
-    }
+    ctx.fillText("PIZZA", 103, 84);
     ctx.restore();
   }
 
@@ -1487,11 +1459,9 @@
 
   function drawTarget() {
     if (state !== "playing" || delivered >= levelData.required) return;
-    const returningToPizzeria = pizzasCarried <= 0;
-    const house = returningToPizzeria ? null : world.houses[currentTarget];
-    const x = returningToPizzeria ? PIZZERIA.refillX : house.doorX;
-    const targetY = returningToPizzeria ? PIZZERIA.refillY : house.doorY;
-    const y = returningToPizzeria ? targetY - 42 + Math.sin(animationClock * 5) * 7 : targetY - 42 + Math.sin(animationClock * 5) * 7;
+    const house = world.houses[currentTarget];
+    const x = house.doorX;
+    const y = house.doorY - 42 + Math.sin(animationClock * 5) * 7;
 
     const pulse = 1 + Math.sin(animationClock * 4) * .08;
     ctx.save();
@@ -1527,20 +1497,20 @@
       ctx.lineDashOffset = -animationClock * 42;
       ctx.beginPath();
       ctx.moveTo(player.x, player.y - 27);
-      const midY = isOnRoad(player.x, player.y, 12) ? player.y : targetY;
-      ctx.quadraticCurveTo((player.x + x) / 2, midY, x, targetY);
+      const midY = isOnRoad(player.x, player.y, 12) ? player.y : house.doorY;
+      ctx.quadraticCurveTo((player.x + x) / 2, midY, x, house.doorY);
       ctx.stroke();
       ctx.setLineDash([]);
       ctx.restore();
     }
 
-    const near = player && Math.hypot(player.x - x, player.y - targetY) < 85;
+    const near = player && Math.hypot(player.x - house.doorX, player.y - house.doorY) < 85;
     if (near) {
-      fillRoundedRect(ctx, x - 86, targetY + 12, 172, 35, 12, "rgba(36,22,47,.88)");
+      fillRoundedRect(ctx, x - 86, house.doorY + 12, 172, 35, 12, "rgba(36,22,47,.88)");
       ctx.fillStyle = "#fff";
       ctx.font = "800 15px Nunito";
       ctx.textAlign = "center";
-      ctx.fillText(returningToPizzeria ? "PIZZERÍA · COMPRAR PIZZAS" : "E / ESPACIO · ENTREGAR", x, targetY + 35);
+      ctx.fillText("E / ESPACIO · ENTREGAR", x, house.doorY + 35);
     }
   }
 
@@ -1924,51 +1894,6 @@
     });
   }
 
-  function refreshShop() {
-    const upgrades = getUpgrades();
-    ["speed", "capacity", "health"].forEach(type => {
-      const button = el[`${type}UpgradeBtn`];
-      const price = SHOP_COSTS[type] * (upgrades[type] + 1);
-      button.querySelector("b").textContent = `${price} 🪙`;
-      button.disabled = score < price;
-    });
-  }
-
-  function openShop() {
-    state = "shop";
-    shopSelection = 0;
-    showOnly(el.shop);
-    refreshShop();
-    updateShopSelection();
-  }
-
-  function closeShop() {
-    state = "playing";
-    showOnly(null);
-    updateHud();
-  }
-
-  function buyUpgrade(type) {
-    const upgrades = getUpgrades();
-    const price = SHOP_COSTS[type] * (upgrades[type] + 1);
-    if (score < price) return;
-    score -= price;
-    upgrades[type] += 1;
-    localStorage.setItem("pizzaDashUpgrades", JSON.stringify(upgrades));
-    if (type === "speed" && player) player.speed += 25;
-    if (type === "health") hearts += 1;
-    updateHud();
-    refreshShop();
-    showToast("¡Mejora comprada!");
-  }
-
-  function updateShopSelection() {
-    document.querySelectorAll(".shop-card").forEach((card, index) => {
-      card.classList.toggle("is-selected", index === shopSelection);
-      card.setAttribute("aria-selected", String(index === shopSelection));
-    });
-  }
-
   bindButton("playBtn", openLevelSelect);
   bindButton("howBtn", openHow);
   bindButton("closeHowBtn", openMenu);
@@ -1979,17 +1904,6 @@
   bindButton("resultMenuBtn", openMenu);
   bindButton("retryBtn", () => beginLevel(activeLevel));
   bindButton("nextBtn", () => beginLevel(Math.min(activeLevel + 1, LEVELS.length - 1)));
-  bindButton("closeShopBtn", closeShop);
-  el.shopBtn.addEventListener("click", () => {
-    sound("click");
-    openShop();
-  });
-  ["speed", "capacity", "health"].forEach(type => {
-    el[`${type}UpgradeBtn`].addEventListener("click", () => {
-      sound("click");
-      buyUpgrade(type);
-    });
-  });
 
   el.pauseBtn.addEventListener("click", () => {
     sound("click");
@@ -2003,34 +1917,22 @@
   });
 
   document.querySelectorAll(".level-card").forEach(card => {
-    card.addEventListener("click", () => beginLevel(Number(card.dataset.level)));
+    card.addEventListener("click", () => {
+      if (card.dataset.url) {
+        window.location.href = card.dataset.url;
+        return;
+      }
+      beginLevel(Number(card.dataset.level));
+    });
   });
 
   window.addEventListener("keydown", event => {
     const code = event.code;
-    if (state === "shop") {
-      if (["ArrowLeft", "KeyA", "ArrowUp", "KeyW"].includes(code)) shopSelection = (shopSelection + 2) % 3;
-      if (["ArrowRight", "KeyD", "ArrowDown", "KeyS"].includes(code)) shopSelection = (shopSelection + 1) % 3;
-      if (["ArrowLeft", "KeyA", "ArrowRight", "KeyD", "ArrowUp", "KeyW", "ArrowDown", "KeyS"].includes(code)) {
-        event.preventDefault();
-        updateShopSelection();
-      }
-      if (code === "Enter" || code === "Space") {
-        event.preventDefault();
-        ["speed", "capacity", "health"][shopSelection] && buyUpgrade(["speed", "capacity", "health"][shopSelection]);
-      }
-      if (code === "Escape") closeShop();
-      return;
-    }
     const gameKeys = ["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space","KeyW","KeyA","KeyS","KeyD","KeyE","ShiftLeft","ShiftRight"];
     if (gameKeys.includes(code)) event.preventDefault();
 
     keys.add(code);
-    if ((code === "Space" || code === "KeyE") && !event.repeat) {
-      const nearShop = world?.shop && Math.hypot(player.x - world.shop.doorX, player.y - world.shop.doorY) < 86;
-      if (nearShop) openShop();
-      else attemptDelivery();
-    }
+    if ((code === "Space" || code === "KeyE") && !event.repeat) attemptDelivery();
     if (code === "Escape") {
       if (state === "playing" || state === "paused") togglePause();
     }
@@ -2064,9 +1966,9 @@
     attemptDelivery();
   });
 
-  levelData = LEVELS[0];
+  levelData = LEVELS[1];
   world = createDecorativeWorld();
   refreshLevelStars();
-  openMenu();
+  beginLevel(1);
   requestAnimationFrame(loop);
 })();

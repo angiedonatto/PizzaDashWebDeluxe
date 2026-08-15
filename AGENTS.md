@@ -4,20 +4,20 @@
 
 This is a static browser game built with plain HTML, CSS, and JavaScript. There is no package manager or build pipeline.
 
-- `index.html`: page structure, screens, HUD, and mobile controls.
-- `styles.css`: responsive layout, overlays, HUD, menu, and touch controls.
-- `game.js`: shared game state, drawing, movement, collisions, audio, rival AI, and effects.
-- `assets/levels/level-1/config.js`: Barrio Soleado configuration.
-- `assets/levels/level-2/config.js`: Parque Central configuration.
-- `assets/levels/level-3/config.js`: Ciudad Nocturna configuration.
+- `index.html`: main menu, instructions, and level navigation only.
+- `styles.css`: shared identity, menu, HUD, overlays, buttons, and touch controls.
+- `assets/shared/progress.js`: small shared progress/star display logic.
+- `assets/levels/level-N/index.html`: standalone page for a level.
+- `assets/levels/level-N/game.js`: executable implementation for that level.
+- `assets/levels/level-N/level.css`: level-specific style hooks.
 - `assets/menu/`: reserved for menu-specific assets; current menu markup and styling remain in `index.html` and `styles.css`.
 - `README.md`: user-facing run instructions.
 - `.github/workflows/pages.yml`: GitHub Pages deployment workflow.
 - `.nojekyll`: keeps GitHub Pages from processing the site with Jekyll.
 
-The level configuration is loaded before `game.js` by `index.html`. Visuals and
-sounds are still generated in code, with the asset folders providing a clear
-home for future level- or menu-specific resources.
+Do not reintroduce a root `game.js` engine. Map construction, entities, traffic,
+weather, rivals, obstacles, positions, and level rules belong inside each
+`assets/levels/level-N/game.js`.
 
 ## Build, Test, and Development Commands
 
@@ -36,7 +36,10 @@ http://localhost:5500
 Check JavaScript syntax before committing:
 
 ```bash
-node --check game.js
+node --check assets/levels/level-1/game.js
+node --check assets/levels/level-2/game.js
+node --check assets/levels/level-3/game.js
+node --check assets/levels/level-4/game.js
 ```
 
 Do not run `npm install`; this project intentionally has no `package.json` or Node dependencies.
@@ -52,7 +55,10 @@ Avoid introducing dependencies unless the project direction changes. Keep gamepl
 There is no automated test suite yet. At minimum, run:
 
 ```bash
-node --check game.js
+node --check assets/levels/level-1/game.js
+node --check assets/levels/level-2/game.js
+node --check assets/levels/level-3/game.js
+node --check assets/levels/level-4/game.js
 ```
 
 Manual test on desktop and mobile widths. Verify: menu layout, touch controls, all three levels, delivery, refill at the pizzeria, rival behavior, lightning, pause/resume, and GitHub Pages after deployment.
@@ -79,4 +85,4 @@ Pull requests should include a concise summary, manual test notes, and screensho
 
 ## Agent-Specific Instructions
 
-Keep the game mobile-first. When changing collisions, verify the player cannot walk through houses but can still reach doors and the pizzeria refill zone. Do not overwrite unrelated local changes.
+Keep the game mobile-first. Keep `assets/shared/` small: progress, simple utilities, and visual identity only. Do not place level maps, entities, traffic, rivals, weather, collisions, or mechanics there. Do not overwrite unrelated local changes.

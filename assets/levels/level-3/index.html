@@ -5,10 +5,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="theme-color" content="#16111f" />
   <title>Pizza Dash — Aventura de reparto</title>
-  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="../../../styles.css"
+  <link rel="stylesheet" href="level.css" />
 </head>
 <body>
-  <main class="page-shell menu-page">
+  <main class="page-shell">
     <section class="game-frame" aria-label="Pizza Dash">
       <div class="frame-glow"></div>
 
@@ -17,9 +18,49 @@
           <span class="mini-brand__slice">🍕</span>
           <span>Pizza Dash</span>
         </div>
+        <div class="topbar-actions">
+          <button id="soundBtn" class="icon-button" type="button" aria-label="Activar o desactivar sonido">🔊</button>
+          <button id="pauseBtn" class="icon-button hidden" type="button" aria-label="Pausar">Ⅱ</button>
+        </div>
       </header>
 
-      <div class="canvas-wrap menu-shell">
+      <div class="canvas-wrap">
+        <canvas id="gameCanvas" width="1280" height="720" aria-label="Juego Pizza Dash"></canvas>
+
+        <section id="hud" class="hud hidden" aria-live="polite">
+          <div class="hud-group">
+            <div class="hud-pill hud-pill--level">
+              <span class="hud-label">NIVEL</span>
+              <strong id="hudLevel">1</strong>
+            </div>
+            <div class="hud-pill">
+              <span class="hud-icon">⏱</span>
+              <strong id="hudTime">01:30</strong>
+            </div>
+          </div>
+
+          <div class="hud-center">
+            <div class="mission-card">
+              <span id="missionText">Entrega la pizza</span>
+              <div class="mission-progress">
+                <span id="missionProgress"></span>
+              </div>
+            </div>
+          </div>
+
+          <div class="hud-group hud-group--right">
+            <div class="hud-pill">
+              <span class="hud-icon">🍕</span>
+              <strong id="hudDeliveries">0/3</strong>
+            </div>
+            <div class="hud-pill">
+              <span class="hud-icon">🪙</span>
+              <strong id="hudScore">0</strong>
+            </div>
+            <div class="hud-pill hud-pill--hearts" id="hudHearts" aria-label="Vidas">♥ ♥ ♥</div>
+          </div>
+        </section>
+
         <section id="menuScreen" class="overlay-screen overlay-screen--menu">
           <div class="menu-hero">
             <div class="eyebrow">UNA AVENTURA SABROSA</div>
@@ -80,7 +121,7 @@
             </div>
 
             <div class="level-grid">
-              <a class="level-card level-card--one" href="assets/levels/level-1/">
+              <button class="level-card level-card--one" data-level="0" data-url="../level-1/" type="button">
                 <span class="level-number">01</span>
                 <span class="level-scene">
                   <span class="scene-house scene-house--a"></span>
@@ -94,9 +135,9 @@
                   <small>3 entregas · Tráfico suave</small>
                 </span>
                 <span class="level-stars" id="stars-0">☆ ☆ ☆</span>
-              </a>
+              </button>
 
-              <a class="level-card level-card--two" href="assets/levels/level-2/">
+              <button class="level-card level-card--two" data-level="1" data-url="../level-2/" type="button">
                 <span class="level-number">02</span>
                 <span class="level-scene">
                   <span class="scene-park"></span>
@@ -109,9 +150,9 @@
                   <small>4 entregas · Charcos y gatos</small>
                 </span>
                 <span class="level-stars" id="stars-1">☆ ☆ ☆</span>
-              </a>
+              </button>
 
-              <a class="level-card level-card--three" href="assets/levels/level-3/">
+              <button class="level-card level-card--three" data-level="2" data-url="../level-3/" type="button">
                 <span class="level-number">03</span>
                 <span class="level-scene">
                   <span class="scene-night-road"></span>
@@ -124,7 +165,7 @@
                   <small>5 entregas · Lluvia y tráfico</small>
                 </span>
                 <span class="level-stars" id="stars-2">☆ ☆ ☆</span>
-              </a>
+              </button>
             </div>
           </div>
         </section>
@@ -169,6 +210,62 @@
             <button id="howPlayBtn" class="primary-button primary-button--small" type="button">ENTENDIDO</button>
           </div>
         </section>
+
+        <section id="pauseScreen" class="overlay-screen hidden">
+          <div class="panel result-panel">
+            <span class="result-icon">Ⅱ</span>
+            <h2>Juego pausado</h2>
+            <p>Respira. La pizza seguirá caliente.</p>
+            <div class="result-actions">
+              <button id="resumeBtn" class="primary-button primary-button--small" type="button">CONTINUAR</button>
+              <button id="pauseMenuBtn" class="secondary-button" type="button">MENÚ</button>
+            </div>
+          </div>
+        </section>
+
+        <section id="resultScreen" class="overlay-screen hidden">
+          <div class="panel result-panel">
+            <span id="resultIcon" class="result-icon">🏆</span>
+            <span id="resultEyebrow" class="eyebrow">MISIÓN COMPLETA</span>
+            <h2 id="resultTitle">¡Entrega perfecta!</h2>
+            <p id="resultMessage">El barrio ya tiene la cena lista.</p>
+
+            <div class="result-stars" id="resultStars">★ ★ ★</div>
+
+            <div class="result-stats">
+              <div>
+                <span>Tiempo</span>
+                <strong id="resultTime">01:02</strong>
+              </div>
+              <div>
+                <span>Puntaje</span>
+                <strong id="resultScore">850</strong>
+              </div>
+              <div>
+                <span>Entregas</span>
+                <strong id="resultDeliveries">3/3</strong>
+              </div>
+            </div>
+
+            <div class="result-actions">
+              <button id="nextBtn" class="primary-button primary-button--small" type="button">SIGUIENTE NIVEL</button>
+              <button id="retryBtn" class="secondary-button" type="button">REPETIR</button>
+              <button id="resultMenuBtn" class="secondary-button" type="button">MENÚ</button>
+            </div>
+          </div>
+        </section>
+
+        <div id="toast" class="toast hidden">¡Pizza entregada!</div>
+
+        <div class="mobile-controls" id="mobileControls">
+          <div class="dpad">
+            <button data-key="ArrowUp" class="dpad-up" aria-label="Arriba">▲</button>
+            <button data-key="ArrowLeft" class="dpad-left" aria-label="Izquierda">◀</button>
+            <button data-key="ArrowDown" class="dpad-down" aria-label="Abajo">▼</button>
+            <button data-key="ArrowRight" class="dpad-right" aria-label="Derecha">▶</button>
+          </div>
+          <button id="mobileAction" class="mobile-action" aria-label="Entregar pizza">🍕</button>
+        </div>
       </div>
     </section>
 
@@ -177,6 +274,6 @@
     </p>
   </main>
 
-  <script src="assets/shared/progress.js"></script>
+  <script src="game.js"></script>
 </body>
 </html>

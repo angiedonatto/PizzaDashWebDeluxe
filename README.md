@@ -61,19 +61,33 @@ No ejecutes `npm install`. Este proyecto no usa Node, paquetes ni `package.json`
 PizzaDashWebDeluxe/
 ├── index.html
 ├── styles.css
-├── game.js
 ├── assets/
+│   ├── shared/
+│   │   └── progress.js
 │   ├── menu/
 │   └── levels/
-│       ├── level-1/config.js
-│       ├── level-2/config.js
-│       └── level-3/config.js
+│       ├── level-1/
+│       │   ├── index.html
+│       │   ├── game.js
+│       │   └── level.css
+│       ├── level-2/
+│       │   ├── index.html
+│       │   ├── game.js
+│       │   └── level.css
+│       ├── level-3/
+│       │   ├── index.html
+│       │   ├── game.js
+│       │   └── level.css
+│       └── level-4/
+│           ├── index.html
+│           ├── game.js
+│           └── level.css
 ├── start.command
 ├── start.bat
 ├── AGENTS.md
 └── README.md
 ```
 
-La configuración de cada nivel está separada en `assets/levels/level-N/`.
-Los elementos del menú están en `index.html` y `styles.css`; la carpeta
-`assets/menu/` está reservada para futuros recursos específicos del menú.
+El menú principal vive en `index.html`. Cada nivel tiene su propia página,
+implementación y estilos en `assets/levels/level-N/`. La lógica compartida se
+limita a progreso global en `assets/shared/progress.js`.

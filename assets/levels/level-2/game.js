@@ -1,5 +1,46 @@
+const LEVELS = [{
+  name: "Barrio Soleado",
+  duration: 95,
+  required: 3,
+  traffic: 105,
+  theme: "neighborhood",
+  mode: "solo",
+  sky: "#8ed8ff",
+  grass: "#86c968",
+  road: "#6c7480",
+  accent: "#ef5a43",
+  start: { x: 632, y: 360 }
+}];
+LEVELS.push({
+  name: "Parque Central",
+  duration: 105,
+  required: 4,
+  traffic: 125,
+  theme: "park",
+  mode: "race",
+  sky: "#a6e4ff",
+  grass: "#75bd65",
+  road: "#7c786f",
+  accent: "#3e9b5f",
+  start: { x: 600, y: 580 }
+});
+LEVELS.push({
+  name: "Ciudad Nocturna",
+  duration: 115,
+  required: 5,
+  traffic: 155,
+  theme: "night",
+  mode: "stormRace",
+  sky: "#202757",
+  grass: "#334b52",
+  road: "#3f4659",
+  accent: "#8d5fd3",
+  start: { x: 632, y: 360 }
+});
 (() => {
   "use strict";
+
+  const LEVEL_URLS = ["../level-1/", "../level-2/", "../level-3/"];
 
   const canvas = document.getElementById("gameCanvas");
   const ctx = canvas.getContext("2d");
@@ -879,7 +920,14 @@
       el.resultMenuBtn.classList.toggle("hidden", hasNextLevel);
       if (hasNextLevel) {
         showToast(`¡Nivel ${activeLevel + 1} listo! Avanzando...`);
-        autoAdvanceTimer = setTimeout(() => beginLevel(activeLevel + 1), 1450);
+        autoAdvanceTimer = setTimeout(() => {
+          const nextUrl = LEVEL_URLS[activeLevel + 1];
+          if (nextUrl) {
+            window.location.href = nextUrl;
+            return;
+          }
+          beginLevel(activeLevel + 1);
+        }, 1450);
       }
       sound("win");
     } else {
@@ -1869,7 +1917,13 @@
   });
 
   document.querySelectorAll(".level-card").forEach(card => {
-    card.addEventListener("click", () => beginLevel(Number(card.dataset.level)));
+    card.addEventListener("click", () => {
+      if (card.dataset.url) {
+        window.location.href = card.dataset.url;
+        return;
+      }
+      beginLevel(Number(card.dataset.level));
+    });
   });
 
   window.addEventListener("keydown", event => {
@@ -1912,9 +1966,9 @@
     attemptDelivery();
   });
 
-  levelData = LEVELS[0];
+  levelData = LEVELS[1];
   world = createDecorativeWorld();
   refreshLevelStars();
-  openMenu();
+  beginLevel(1);
   requestAnimationFrame(loop);
 })();

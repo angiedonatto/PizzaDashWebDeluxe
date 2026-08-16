@@ -146,6 +146,14 @@
     height: 48%;
   }
 
+  .dpad.is-sprinting button {
+    border-color: rgba(255,216,95,.72);
+    box-shadow:
+      inset 0 2px 0 rgba(255,255,255,.2),
+      0 0 0 3px rgba(255,216,95,.12),
+      0 10px 22px rgba(255,151,61,.2);
+  }
+
   .mobile-action {
     position: static;
     background:

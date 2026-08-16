@@ -67,6 +67,9 @@ import { createRenderer } from "./src/rendering.js";
   let rival = null;
   let stormTimer = 0;
   let pauseToggleGuard = 0;
+  let mobileSprintActive = false;
+  let lastMobileDirectionTapAt = 0;
+  let lastMobileDirectionCode = "";
   const particles = [];
   const floatTexts = [];
   const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
@@ -238,6 +241,27 @@ import { createRenderer } from "./src/rendering.js";
 
   function setMusicPaused(paused) {
     audio.setMusicPaused(paused);
+  }
+
+  function updateSoundButtonState() {
+    el.soundBtn.classList.toggle("is-muted", !audioEnabled);
+    el.soundBtn.setAttribute("aria-label", audioEnabled ? "Desactivar sonido" : "Activar sonido");
+  }
+
+  function setMobileSprintActive(active) {
+    mobileSprintActive = active;
+    if (active) {
+      keys.add("ShiftLeft");
+    } else {
+      keys.delete("ShiftLeft");
+    }
+    document.querySelector(".dpad")?.classList.toggle("is-sprinting", active);
+  }
+
+  function clearMobileSprint() {
+    setMobileSprintActive(false);
+    lastMobileDirectionTapAt = 0;
+    lastMobileDirectionCode = "";
   }
 
   function showOnly(screen) {
@@ -1805,13 +1829,19 @@ import { createRenderer } from "./src/rendering.js";
 
   el.soundBtn.addEventListener("click", () => {
     audioEnabled = !audioEnabled;
-    el.soundBtn.textContent = audioEnabled ? "🔊" : "🔇";
+    updateSoundButtonState();
     if (audioEnabled) {
       sound("click");
       if (state === "playing") startBackgroundMusic();
     } else {
       stopBackgroundMusic();
     }
+  });
+
+  document.querySelectorAll(".mobile-controls, .mobile-controls button, .topbar-actions button, .control-icon").forEach(node => {
+    ["contextmenu", "selectstart", "dragstart"].forEach(type => {
+      node.addEventListener(type, event => event.preventDefault());
+    });
   });
 
   document.querySelectorAll(".level-card").forEach(card => {
@@ -1839,6 +1869,7 @@ import { createRenderer } from "./src/rendering.js";
   window.addEventListener("keyup", event => keys.delete(event.code));
   window.addEventListener("blur", () => {
     keys.clear();
+    clearMobileSprint();
     if (state === "playing") togglePause();
   });
 
@@ -1846,6 +1877,21 @@ import { createRenderer } from "./src/rendering.js";
     const code = button.dataset.key;
     const press = event => {
       event.preventDefault();
+      const now = performance.now();
+      const doubleTapped = !mobileSprintActive &&
+        code === lastMobileDirectionCode &&
+        now - lastMobileDirectionTapAt < 330;
+
+      if (doubleTapped) {
+        setMobileSprintActive(true);
+        lastMobileDirectionTapAt = 0;
+        lastMobileDirectionCode = "";
+      } else {
+        if (mobileSprintActive) setMobileSprintActive(false);
+        lastMobileDirectionTapAt = now;
+        lastMobileDirectionCode = code;
+      }
+
       keys.add(code);
       getAudioContext();
     };
@@ -1859,14 +1905,17 @@ import { createRenderer } from "./src/rendering.js";
     button.addEventListener("pointerleave", release);
   });
 
-  document.getElementById("mobileAction").addEventListener("pointerdown", event => {
+  const mobileAction = document.getElementById("mobileAction");
+  mobileAction.addEventListener("pointerdown", event => {
     event.preventDefault();
+    getAudioContext();
     attemptDelivery();
   });
 
   levelData = LEVELS[2];
   world = createDecorativeWorld();
   refreshLevelStars();
+  updateSoundButtonState();
   beginLevel(2);
   requestAnimationFrame(loop);
 })();

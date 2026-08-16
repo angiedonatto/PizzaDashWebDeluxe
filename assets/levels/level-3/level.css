@@ -62,24 +62,26 @@
   display: block;
 }
 
-@media (max-width: 650px), (hover: none) and (pointer: coarse) {
+@media (max-width: 650px), (hover: none) and (pointer: coarse), (orientation: landscape) and (max-height: 760px) {
   .canvas-wrap,
   #gameCanvas {
     background: #17192d;
   }
 
   .canvas-wrap {
-    display: grid;
-    place-items: center;
+    display: block;
   }
 
   #gameCanvas {
-    width: 100%;
-    height: 84%;
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: auto;
+    height: auto;
     max-width: none;
     max-height: none;
-    object-fit: cover;
-    object-position: 50% 50%;
+    object-fit: fill;
+    will-change: transform;
   }
 
   .hud {
@@ -131,12 +133,13 @@
     color: transparent;
     font-size: 0;
     overflow: hidden;
-    border: 2px solid rgba(255,255,255,.44);
+    border: 2px solid rgba(255,255,255,.32);
     background:
-      linear-gradient(180deg, rgba(83,96,130,.9), rgba(37,29,54,.92));
+      linear-gradient(180deg, rgba(83,96,130,.58), rgba(37,29,54,.54));
     box-shadow:
-      inset 0 2px 0 rgba(255,255,255,.18),
-      0 8px 18px rgba(10,8,20,.24);
+      inset 0 2px 0 rgba(255,255,255,.12),
+      0 7px 16px rgba(10,8,20,.16);
+    backdrop-filter: blur(7px);
     -webkit-touch-callout: none;
     -webkit-user-select: none;
     user-select: none;
@@ -148,18 +151,18 @@
   }
 
   .dpad.is-sprinting button {
-    border-color: rgba(255,216,95,.72);
+    border-color: rgba(255,216,95,.58);
     box-shadow:
-      inset 0 2px 0 rgba(255,255,255,.2),
+      inset 0 2px 0 rgba(255,255,255,.16),
       0 0 0 3px rgba(255,216,95,.12),
-      0 10px 22px rgba(255,151,61,.2);
+      0 10px 22px rgba(255,151,61,.16);
   }
 
   .mobile-action {
     position: static;
     background:
-      radial-gradient(circle at 35% 24%, rgba(255,255,255,.3), transparent 24%),
-      linear-gradient(180deg, #ef6358, #c8423d);
+      radial-gradient(circle at 35% 24%, rgba(255,255,255,.22), transparent 24%),
+      linear-gradient(180deg, rgba(239,99,88,.66), rgba(200,66,61,.62));
   }
 
   .mobile-action .control-icon {
@@ -170,10 +173,10 @@
   }
 }
 
-@media (max-width: 650px) and (orientation: landscape), (hover: none) and (pointer: coarse) and (orientation: landscape) {
+@media (max-width: 650px) and (orientation: landscape), (hover: none) and (pointer: coarse) and (orientation: landscape), (orientation: landscape) and (max-height: 760px) {
   #gameCanvas {
-    width: 100%;
-    height: 100%;
+    width: auto;
+    height: auto;
   }
 
   .hud {

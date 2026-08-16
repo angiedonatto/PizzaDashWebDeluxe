@@ -69,12 +69,13 @@
   }
 
   .canvas-wrap {
-    display: block;
+    display: grid;
+    place-items: center;
   }
 
   #gameCanvas {
     width: 100%;
-    height: 100%;
+    height: 84%;
     max-width: none;
     max-height: none;
     object-fit: cover;

@@ -1,3 +1,84 @@
 :root {
   --level-accent: #8d5fd3;
 }
+
+.canvas-wrap,
+#gameCanvas {
+  background: #17192d;
+}
+
+@media (max-width: 650px), (hover: none) and (pointer: coarse) {
+  .canvas-wrap,
+  #gameCanvas {
+    background: #17192d;
+  }
+
+  .canvas-wrap {
+    display: block;
+  }
+
+  #gameCanvas {
+    width: 100%;
+    height: 100%;
+    max-width: none;
+    max-height: none;
+    object-fit: cover;
+    object-position: 50% 50%;
+  }
+
+  .hud {
+    inset: max(46px, env(safe-area-inset-top)) 8px auto;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 6px;
+  }
+
+  .hud-group {
+    flex-wrap: nowrap;
+  }
+
+  .hud-center {
+    grid-column: 1 / -1;
+    min-width: 0;
+    order: 3;
+  }
+
+  .mission-card {
+    padding: 7px 10px 8px;
+    border-radius: 14px;
+  }
+
+  .mission-card > span {
+    margin-bottom: 5px;
+    font-size: 11px;
+    line-height: 1.15;
+  }
+
+  .toast {
+    bottom: calc(94px + env(safe-area-inset-bottom));
+    max-width: 64dvw;
+    padding: 9px 12px;
+    font-size: 14px;
+  }
+
+  .mobile-controls {
+    bottom: max(14px, env(safe-area-inset-bottom));
+  }
+}
+
+@media (max-width: 650px) and (orientation: landscape), (hover: none) and (pointer: coarse) and (orientation: landscape) {
+  #gameCanvas {
+    width: 100%;
+    height: 100%;
+  }
+
+  .hud {
+    inset: 8px 8px auto;
+    grid-template-columns: auto minmax(210px, .65fr) auto;
+    align-items: start;
+  }
+
+  .hud-center {
+    grid-column: auto;
+    order: initial;
+  }
+}

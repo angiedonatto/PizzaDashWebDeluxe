@@ -69,10 +69,12 @@ export function createRenderer(deps) {
     const alpha = clamp(levelIntroTimer / .8, 0, 1);
     ctx.save();
     ctx.globalAlpha = alpha;
-    fillRoundedRect(ctx, W / 2 - 250, 102, 500, 86, 22, "rgba(36,22,47,.88)");
+    const hasIntro = Boolean(levelData.intro);
+    const panelH = hasIntro ? 118 : 86;
+    fillRoundedRect(ctx, W / 2 - 285, 102, 570, panelH, 22, "rgba(36,22,47,.9)");
     ctx.strokeStyle = "rgba(255,216,95,.8)";
     ctx.lineWidth = 3;
-    roundedRectPath(ctx, W / 2 - 250, 102, 500, 86, 22);
+    roundedRectPath(ctx, W / 2 - 285, 102, 570, panelH, 22);
     ctx.stroke();
     ctx.fillStyle = "#ffd85f";
     ctx.font = "900 18px Trebuchet MS";
@@ -81,6 +83,11 @@ export function createRenderer(deps) {
     ctx.fillStyle = "#fff";
     ctx.font = "900 32px Trebuchet MS";
     ctx.fillText(levelData.name, W / 2, 166);
+    if (hasIntro) {
+      ctx.fillStyle = "rgba(255,255,255,.86)";
+      ctx.font = "900 20px Trebuchet MS";
+      ctx.fillText(levelData.intro, W / 2, 198);
+    }
     ctx.restore();
   }
 

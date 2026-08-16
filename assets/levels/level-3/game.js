@@ -941,7 +941,7 @@ import { createRenderer } from "./src/rendering.js";
     el.hud.classList.remove("hidden");
     el.pauseBtn.classList.remove("hidden");
     updateHud();
-    showToast(`Nivel ${index + 1}: ${levelData.name}`);
+    showToast(levelData.intro || `Nivel ${index + 1}: ${levelData.name}`);
     sound("click");
     startBackgroundMusic();
   }

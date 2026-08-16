@@ -240,6 +240,11 @@ import { createRenderer } from "./src/rendering.js";
     audio.setMusicPaused(paused);
   }
 
+  function updateSoundButtonState() {
+    el.soundBtn.classList.toggle("is-muted", !audioEnabled);
+    el.soundBtn.setAttribute("aria-label", audioEnabled ? "Desactivar sonido" : "Activar sonido");
+  }
+
   function showOnly(screen) {
     [el.menu, el.level, el.how, el.pause, el.result].forEach(node => node.classList.add("hidden"));
     if (screen) screen.classList.remove("hidden");
@@ -1805,13 +1810,19 @@ import { createRenderer } from "./src/rendering.js";
 
   el.soundBtn.addEventListener("click", () => {
     audioEnabled = !audioEnabled;
-    el.soundBtn.textContent = audioEnabled ? "🔊" : "🔇";
+    updateSoundButtonState();
     if (audioEnabled) {
       sound("click");
       if (state === "playing") startBackgroundMusic();
     } else {
       stopBackgroundMusic();
     }
+  });
+
+  document.querySelectorAll(".mobile-controls, .mobile-controls button, .topbar-actions button, .control-icon").forEach(node => {
+    ["contextmenu", "selectstart", "dragstart"].forEach(type => {
+      node.addEventListener(type, event => event.preventDefault());
+    });
   });
 
   document.querySelectorAll(".level-card").forEach(card => {
@@ -1867,6 +1878,7 @@ import { createRenderer } from "./src/rendering.js";
   levelData = LEVELS[2];
   world = createDecorativeWorld();
   refreshLevelStars();
+  updateSoundButtonState();
   beginLevel(2);
   requestAnimationFrame(loop);
 })();

@@ -76,9 +76,9 @@ import { createRenderer } from "./src/rendering.js";
   const lerp = (a, b, t) => a + (b - a) * t;
   const distance = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
   const rand = (min, max) => min + Math.random() * (max - min);
-  const mobileCameraQuery = window.matchMedia("(max-width: 650px), (hover: none) and (pointer: coarse)");
-  let mobileCameraX = .5;
-  let mobileCameraY = .5;
+  const mobileCameraQuery = window.matchMedia("(max-width: 650px), (hover: none) and (pointer: coarse), (orientation: landscape) and (max-height: 760px)");
+  let mobileCameraX = 0;
+  let mobileCameraY = 0;
 
   const renderer = createRenderer({
     ctx, W, H, PIZZERIA, RIVAL_PIZZERIA, MAX_PIZZAS, clamp, lerp,
@@ -110,26 +110,43 @@ import { createRenderer } from "./src/rendering.js";
 
   function updateResponsiveCamera(dt) {
     if (!mobileCameraQuery.matches) {
-      if (canvas.style.objectPosition) canvas.style.objectPosition = "";
+      canvas.style.width = "";
+      canvas.style.height = "";
+      canvas.style.transform = "";
+      canvas.style.objectPosition = "";
       return;
     }
 
-    const rect = canvas.getBoundingClientRect();
-    const scale = Math.max(rect.width / W, rect.height / H);
-    const overflowX = Math.max(0, W * scale - rect.width);
-    const overflowY = Math.max(0, H * scale - rect.height);
-    const desiredX = rect.width * .5;
-    const desiredY = rect.height * .5;
-    const targetX = player && overflowX > 1
-      ? clamp((player.x * scale - desiredX) / overflowX, 0, 1)
-      : .5;
-    const targetY = player && overflowY > 1
-      ? clamp((player.y * scale - desiredY) / overflowY, 0, 1)
-      : .5;
-    const follow = clamp(dt * 5.5, 0, 1);
+    const viewport = canvas.parentElement?.getBoundingClientRect();
+    if (!viewport?.width || !viewport?.height) return;
+
+    const landscapeView = viewport.width > viewport.height;
+    const zoom = landscapeView ? 1 : .84;
+    const scale = Math.max(viewport.width / W, viewport.height / H) * zoom;
+    const renderedW = W * scale;
+    const renderedH = H * scale;
+    const centerX = (viewport.width - renderedW) * .5;
+    const centerY = (viewport.height - renderedH) * .5;
+    const minX = viewport.width - renderedW;
+    const minY = viewport.height - renderedH;
+    const desiredX = viewport.width * .5;
+    const desiredY = viewport.height * (landscapeView ? .58 : .5);
+    const targetX = renderedW <= viewport.width
+      ? centerX
+      : player
+      ? clamp(desiredX - player.x * scale, minX, 0)
+      : centerX;
+    const targetY = renderedH <= viewport.height
+      ? centerY
+      : player
+      ? clamp(desiredY - player.y * scale, minY, 0)
+      : centerY;
+    const follow = clamp(dt * (landscapeView ? 8 : 5.5), 0, 1);
     mobileCameraX = lerp(mobileCameraX, targetX, follow);
     mobileCameraY = lerp(mobileCameraY, targetY, follow);
-    canvas.style.objectPosition = `${(mobileCameraX * 100).toFixed(2)}% ${(mobileCameraY * 100).toFixed(2)}%`;
+    canvas.style.width = `${renderedW.toFixed(2)}px`;
+    canvas.style.height = `${renderedH.toFixed(2)}px`;
+    canvas.style.transform = `translate3d(${mobileCameraX.toFixed(2)}px, ${mobileCameraY.toFixed(2)}px, 0)`;
   }
 
   function rectsOverlap(a, b) {

@@ -89,6 +89,8 @@ LEVELS.push({
   let previousTime = performance.now();
   let audioEnabled = true;
   let audioContext = null;
+  let musicTimer = null;
+  let musicStep = 0;
   let world = null;
   let player = null;
   let timeLeft = 0;
@@ -115,6 +117,9 @@ LEVELS.push({
   const MAX_PIZZAS = 2;
   const SHOP_COSTS = { speed: 300, capacity: 400, health: 500 };
   const getUpgrades = () => JSON.parse(localStorage.getItem("pizzaDashUpgrades") || '{"speed":0,"capacity":0,"health":0}');
+  const resetUpgrades = () => localStorage.removeItem("pizzaDashUpgrades");
+  // A fresh page load starts a new run instead of restoring the previous run's shop state.
+  resetUpgrades();
   const maxPizzas = () => MAX_PIZZAS + getUpgrades().capacity;
   const maxHearts = () => 3 + getUpgrades().health;
   const PIZZERIA = { x: 12, y: 527, w: 205, h: 122, refillX: 114, refillY: 585, radius: 88 };
@@ -187,6 +192,26 @@ LEVELS.push({
     gain.connect(ac.destination);
     osc.start(now);
     osc.stop(now + duration);
+  }
+
+  // Original royalty-free sunset chiptune composed for Pizza Dash.
+  function startMusic() {
+    if (!audioEnabled || musicTimer) return;
+    const melody = [523.25, 587.33, 659.25, 783.99, 659.25, 587.33, 440, 493.88,
+      523.25, 659.25, 783.99, 880, 783.99, 659.25, 587.33, 493.88];
+    const bass = [130.81, 146.83, 164.81, 196, 174.61, 155.56, 130.81, 116.54];
+    musicStep = 0;
+    musicTimer = window.setInterval(() => {
+      if (!audioEnabled || state === "menu") return;
+      tone(melody[musicStep % melody.length], .22, "triangle", .018);
+      if (musicStep % 2 === 0) tone(bass[(musicStep / 2) % bass.length], .38, "sine", .022);
+      musicStep += 1;
+    }, 260);
+  }
+
+  function stopMusic() {
+    if (musicTimer) window.clearInterval(musicTimer);
+    musicTimer = null;
   }
 
   function sound(name) {
@@ -495,6 +520,7 @@ LEVELS.push({
     updateHud();
     showToast(`Nivel ${index + 1}: ${levelData.name}`);
     sound("click");
+    startMusic();
   }
 
   function createRival(index) {
@@ -1187,30 +1213,26 @@ LEVELS.push({
     }
 
     if (levelData.theme === "park") {
+      // Layered lake with a soft shoreline and animated water bands.
       ctx.fillStyle = "#d8c595";
       ctx.beginPath();
       ctx.ellipse(640, 245, 180, 110, 0, 0, Math.PI * 2);
       ctx.fill();
-      ctx.fillStyle = "#73bcd0";
+      const lake = ctx.createRadialGradient(610, 220, 12, 640, 245, 140);
+      lake.addColorStop(0, "#9ce4e1");
+      lake.addColorStop(.55, "#54b7c8");
+      lake.addColorStop(1, "#287caa");
+      ctx.fillStyle = lake;
       ctx.beginPath();
       ctx.ellipse(640, 245, 118, 67, 0, 0, Math.PI * 2);
       ctx.fill();
-      ctx.strokeStyle = "rgba(255,255,255,.45)";
-      ctx.lineWidth = 4;
-      ctx.beginPath();
-      ctx.ellipse(640, 245, 95, 50, 0, 0, Math.PI * 2);
-      ctx.stroke();
-
-      ctx.strokeStyle = "rgba(255,255,255,.5)";
+      ctx.strokeStyle = "rgba(225,255,246,.55)";
       ctx.lineWidth = 3;
-      ctx.beginPath();
-      ctx.arc(640, 245, 42 + Math.sin(animationClock * 1.8) * 4, 0, Math.PI * 2);
-      ctx.stroke();
-      fillRoundedRect(ctx, 548, 118, 184, 52, 18, "rgba(68,145,90,.8)");
-      ctx.fillStyle = "#fff7d7";
-      ctx.font = "900 18px Trebuchet MS";
-      ctx.textAlign = "center";
-      ctx.fillText("PARQUE", 640, 150);
+      for (let i = 0; i < 4; i += 1) {
+        ctx.beginPath();
+        ctx.ellipse(640, 215 + i * 20, 52 + i * 14, 10 + i * 3, 0, 0, Math.PI * 2);
+        ctx.stroke();
+      }
 
       drawLamp(470, 465);
       drawLamp(810, 465);
@@ -1221,15 +1243,11 @@ LEVELS.push({
       drawLamp(970, 252);
       drawLamp(310, 468);
       drawLamp(970, 468);
-      drawNeonSign(420, 255, "ABIERTO", "#65d9ff");
-      drawNeonSign(850, 468, "HOT", "#ff6f9a");
     } else {
       drawLamp(310, 252);
       drawLamp(970, 252);
       drawLamp(310, 468);
       drawLamp(970, 468);
-      drawYardSign(1030, 255, "2x1");
-      drawYardSign(230, 468, "META");
     }
 
     drawPizzeria();
@@ -1670,6 +1688,7 @@ LEVELS.push({
       const bounce = Math.abs(Math.sin(cat.phase)) * 2;
       ctx.save();
       ctx.translate(cat.x, cat.y - bounce);
+      ctx.scale(1.25, 1.25);
       if (cat.dir < 0) ctx.scale(-1, 1);
 
       ctx.fillStyle = "rgba(48,28,33,.18)";
@@ -1677,7 +1696,9 @@ LEVELS.push({
       ctx.ellipse(0, 14, 18, 5, 0, 0, Math.PI * 2);
       ctx.fill();
 
-      ctx.fillStyle = "#d58a43";
+      const fur = "#c9793d";
+      const stripe = "#7b3f32";
+      ctx.fillStyle = fur;
       ctx.beginPath();
       ctx.ellipse(0, 0, 14, 10, 0, 0, Math.PI * 2);
       ctx.fill();
@@ -1692,6 +1713,24 @@ LEVELS.push({
       ctx.lineTo(19, -19);
       ctx.lineTo(21, -9);
       ctx.fill();
+      ctx.fillStyle = stripe;
+      ctx.fillRect(-8, -8, 3, 8);
+      ctx.fillRect(-1, -10, 3, 9);
+      ctx.fillRect(6, -8, 3, 7);
+      ctx.fillStyle = "#f1b56a";
+      ctx.beginPath();
+      ctx.arc(16, -6, 2.2, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = "#30202b";
+      ctx.beginPath();
+      ctx.arc(16.5, -6, .9, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = "#5b302d";
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(19, -2); ctx.lineTo(27, -4);
+      ctx.moveTo(19, 0); ctx.lineTo(27, 1);
+      ctx.stroke();
       ctx.strokeStyle = "#d58a43";
       ctx.lineWidth = 5;
       ctx.beginPath();
@@ -1956,7 +1995,7 @@ LEVELS.push({
   bindButton("resumeBtn", togglePause);
   bindButton("pauseMenuBtn", openMenu);
   bindButton("resultMenuBtn", openMenu);
-  bindButton("retryBtn", () => beginLevel(activeLevel));
+  bindButton("retryBtn", () => { resetUpgrades(); beginLevel(activeLevel); });
   bindButton("nextBtn", () => beginLevel(Math.min(activeLevel + 1, LEVELS.length - 1)));
   bindButton("closeShopBtn", closeShop);
   ["speed", "capacity", "health"].forEach(type => el[`${type}UpgradeBtn`].addEventListener("click", () => buyUpgrade(type)));
@@ -1969,7 +2008,8 @@ LEVELS.push({
   el.soundBtn.addEventListener("click", () => {
     audioEnabled = !audioEnabled;
     el.soundBtn.textContent = audioEnabled ? "🔊" : "🔇";
-    if (audioEnabled) sound("click");
+    if (audioEnabled) { sound("click"); startMusic(); }
+    else stopMusic();
   });
 
   document.querySelectorAll(".level-card").forEach(card => {

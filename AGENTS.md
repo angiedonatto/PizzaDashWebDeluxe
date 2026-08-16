@@ -19,6 +19,18 @@ Do not reintroduce a root `game.js` engine. Map construction, entities, traffic,
 weather, rivals, obstacles, positions, and level rules belong inside each
 `assets/levels/level-N/game.js`.
 
+## Protected Level 3
+
+`assets/levels/level-3/` is finished and frozen. Do not edit level 3 files for
+any reason unless Angie explicitly asks for a level 3 change. This includes:
+
+- `assets/levels/level-3/index.html`
+- `assets/levels/level-3/game.js`
+- `assets/levels/level-3/level.css`
+- `assets/levels/level-3/src/`
+
+If a shared change would affect level 3, stop and ask before continuing.
+
 ## Build, Test, and Development Commands
 
 Run locally with a simple static server:
@@ -80,6 +92,24 @@ git checkout main
 git pull origin main
 git checkout -b your-name/short-feature
 ```
+
+Before starting any change, make sure your local `main` is updated:
+
+```bash
+git checkout main
+git pull origin main
+```
+
+If you already have a feature branch, update it from the latest `main` before
+continuing work:
+
+```bash
+git checkout your-branch-name
+git merge main
+```
+
+If Git reports conflicts, do not guess. Ask for help before editing conflicted
+files.
 
 Pull requests should include a concise summary, manual test notes, and screenshots or screen recordings for visual/mobile changes.
 

@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="theme-color" content="#16111f" />
   <title>Pizza Dash — Aventura de reparto</title>
-  <link rel="stylesheet" href="../../../styles.css"
+  <link rel="stylesheet" href="../../../styles.css" />
   <link rel="stylesheet" href="level.css" />
 </head>
 <body>
@@ -220,6 +220,20 @@
               <button id="resumeBtn" class="primary-button primary-button--small" type="button">CONTINUAR</button>
               <button id="pauseMenuBtn" class="secondary-button" type="button">MENÚ</button>
             </div>
+          </div>
+        </section>
+
+        <section id="shopScreen" class="overlay-screen hidden">
+          <div class="panel shop-panel">
+            <span class="eyebrow">TIENDA DEL BARRIO</span>
+            <h2>Mercado de mejoras</h2>
+            <p>WASD o flechas para elegir · Enter o Espacio para comprar</p>
+            <div class="shop-grid">
+              <button class="shop-card" id="speedUpgradeBtn" type="button"><span>🏃</span><strong>Zapatos turbo</strong><small>Velocidad +25</small><b></b></button>
+              <button class="shop-card" id="capacityUpgradeBtn" type="button"><span>🍕</span><strong>Mochila grande</strong><small>Capacidad +1</small><b></b></button>
+              <button class="shop-card" id="healthUpgradeBtn" type="button"><span>♥</span><strong>Corazón extra</strong><small>Salud +1</small><b></b></button>
+            </div>
+            <button id="closeShopBtn" class="secondary-button" type="button">CERRAR (ESC)</button>
           </div>
         </section>
 

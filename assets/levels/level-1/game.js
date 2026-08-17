@@ -53,6 +53,7 @@ LEVELS.push({
     how: document.getElementById("howScreen"),
     pause: document.getElementById("pauseScreen"),
     result: document.getElementById("resultScreen"),
+    shop: document.getElementById("shopScreen"),
     hud: document.getElementById("hud"),
     toast: document.getElementById("toast"),
     pauseBtn: document.getElementById("pauseBtn"),
@@ -74,7 +75,11 @@ LEVELS.push({
     resultDeliveries: document.getElementById("resultDeliveries"),
     nextBtn: document.getElementById("nextBtn"),
     retryBtn: document.getElementById("retryBtn"),
-    resultMenuBtn: document.getElementById("resultMenuBtn")
+    resultMenuBtn: document.getElementById("resultMenuBtn"),
+    closeShopBtn: document.getElementById("closeShopBtn"),
+    speedUpgradeBtn: document.getElementById("speedUpgradeBtn"),
+    capacityUpgradeBtn: document.getElementById("capacityUpgradeBtn"),
+    healthUpgradeBtn: document.getElementById("healthUpgradeBtn")
   };
 
   const keys = new Set();
@@ -84,6 +89,8 @@ LEVELS.push({
   let previousTime = performance.now();
   let audioEnabled = true;
   let audioContext = null;
+  let musicTimer = null;
+  let musicStep = 0;
   let world = null;
   let player = null;
   let timeLeft = 0;
@@ -108,6 +115,13 @@ LEVELS.push({
   const particles = [];
   const floatTexts = [];
   const MAX_PIZZAS = 2;
+  const SHOP_COSTS = { speed: 300, capacity: 400, health: 500 };
+  const getUpgrades = () => JSON.parse(localStorage.getItem("pizzaDashUpgrades") || '{"speed":0,"capacity":0,"health":0}');
+  const resetUpgrades = () => localStorage.removeItem("pizzaDashUpgrades");
+  // A fresh page load starts a new run instead of restoring the previous run's shop state.
+  resetUpgrades();
+  const maxPizzas = () => MAX_PIZZAS + getUpgrades().capacity;
+  const maxHearts = () => 3 + getUpgrades().health;
   const PIZZERIA = { x: 12, y: 527, w: 205, h: 122, refillX: 114, refillY: 585, radius: 88 };
 
   const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
@@ -180,6 +194,26 @@ LEVELS.push({
     osc.stop(now + duration);
   }
 
+  // Original royalty-free sunset chiptune composed for Pizza Dash.
+  function startMusic() {
+    if (!audioEnabled || musicTimer) return;
+    const melody = [523.25, 587.33, 659.25, 783.99, 659.25, 587.33, 440, 493.88,
+      523.25, 659.25, 783.99, 880, 783.99, 659.25, 587.33, 493.88];
+    const bass = [130.81, 146.83, 164.81, 196, 174.61, 155.56, 130.81, 116.54];
+    musicStep = 0;
+    musicTimer = window.setInterval(() => {
+      if (!audioEnabled || state === "menu") return;
+      tone(melody[musicStep % melody.length], .22, "triangle", .018);
+      if (musicStep % 2 === 0) tone(bass[(musicStep / 2) % bass.length], .38, "sine", .022);
+      musicStep += 1;
+    }, 260);
+  }
+
+  function stopMusic() {
+    if (musicTimer) window.clearInterval(musicTimer);
+    musicTimer = null;
+  }
+
   function sound(name) {
     if (!audioEnabled) return;
     if (name === "click") {
@@ -202,7 +236,7 @@ LEVELS.push({
   }
 
   function showOnly(screen) {
-    [el.menu, el.level, el.how, el.pause, el.result].forEach(node => node.classList.add("hidden"));
+    [el.menu, el.level, el.how, el.pause, el.result, el.shop].forEach(node => node.classList.add("hidden"));
     if (screen) screen.classList.remove("hidden");
   }
 
@@ -274,10 +308,9 @@ LEVELS.push({
           makeHouse(350, 68, 170, 130, "#efc58e", "#4e7fa7", 435, 221),
           makeHouse(760, 62, 190, 138, "#f7dfb0", "#c95852", 855, 225),
           makeHouse(1000, 70, 205, 135, "#efc897", "#668f69", 1103, 225),
-          makeHouse(74, 486, 215, 140, "#f4d49f", "#548db3", 182, 472),
-          makeHouse(355, 496, 170, 132, "#f0bf8d", "#ce6541", 440, 482),
-          makeHouse(760, 492, 190, 138, "#f4ddb0", "#7a65a7", 855, 477),
-          makeHouse(1002, 490, 205, 136, "#f3ca91", "#d35d4c", 1104, 476)
+          makeHouse(355, 496, 170, 132, "#f0bf8d", "#ce6541", 440, 650),
+          makeHouse(760, 492, 190, 138, "#f4ddb0", "#7a65a7", 855, 648),
+
         ];
 
     if (theme === "night") {
@@ -288,7 +321,9 @@ LEVELS.push({
       });
     }
 
+    const shop = theme === "park" ? { x: 705, y: 350, w: 145, h: 112, doorX: 777, doorY: 474 } : { x: 1002, y: 490, w: 205, h: 136, doorX: 1104, doorY: 648 };
     const obstacles = houses.flatMap(makeHouseObstacles);
+    obstacles.push({ x: shop.x + 12, y: shop.y + 28, w: shop.w - 24, h: shop.h - 28, type: "shop" });
     const trees = [];
     const benches = [];
     const puddles = [];
@@ -354,7 +389,7 @@ LEVELS.push({
 
     const crosswalks = createCrosswalks(roads);
 
-    return { roads, houses, obstacles, trees, benches, puddles, cats, cars, coins, flowerSeed, crosswalks, lightning: [] };
+    return { roads, houses, shop, obstacles, trees, benches, puddles, cats, cars, coins, flowerSeed, crosswalks, lightning: [] };
   }
 
   function makeHouse(x, y, w, h, wall, roof, doorX, doorY) {
@@ -455,7 +490,7 @@ LEVELS.push({
       x: levelData.start.x,
       y: levelData.start.y,
       r: 20,
-      speed: 215,
+      speed: 215 + getUpgrades().speed * 25,
       facing: "right",
       moving: false,
       bump: 0,
@@ -468,8 +503,8 @@ LEVELS.push({
     timeLeft = levelData.duration;
     delivered = 0;
     score = 0;
-    hearts = 3;
-    pizzasCarried = MAX_PIZZAS;
+    hearts = maxHearts();
+    pizzasCarried = maxPizzas();
     currentTarget = 0;
     invulnerable = 0;
     actionCooldown = 0;
@@ -485,6 +520,7 @@ LEVELS.push({
     updateHud();
     showToast(`Nivel ${index + 1}: ${levelData.name}`);
     sound("click");
+    startMusic();
   }
 
   function createRival(index) {
@@ -642,6 +678,15 @@ LEVELS.push({
     if (yAxis > 0 && Math.abs(yAxis) > Math.abs(xAxis)) player.facing = "down";
 
     movePlayer(xAxis * speed * dt, yAxis * speed * dt);
+    const exitRoad = delivered >= levelData.required && world.roads.some(road => road.axis === "x" && player.x >= W - player.r - 10 && player.y > road.y + 18 && player.y < road.y + road.h - 18);
+    if (exitRoad) {
+      if (activeLevel < LEVELS.length - 1) {
+        state = "transitioning";
+        setTimeout(() => { window.location.href = "../level-2/"; }, 650);
+      }
+      else finishLevel(true);
+      return;
+    }
     if (player.moving && sprinting) {
       player.trailTimer -= dt;
       if (player.trailTimer <= 0) {
@@ -756,13 +801,17 @@ LEVELS.push({
   }
 
   function updatePizzeriaRefill() {
-    if (pizzasCarried >= MAX_PIZZAS) return;
+    if (pizzasCarried >= maxPizzas()) return;
     const nearPizzeria = Math.hypot(player.x - PIZZERIA.refillX, player.y - PIZZERIA.refillY) < PIZZERIA.radius;
     if (!nearPizzeria) return;
-    pizzasCarried = MAX_PIZZAS;
+    const pizzasToBuy = maxPizzas() - pizzasCarried;
+    const pizzaCost = (levelData.pizzaCost || 50) * pizzasToBuy;
+    if (score < pizzaCost) { showToast(`Necesitas ${pizzaCost} monedas`); return; }
+    score -= pizzaCost;
+    pizzasCarried = maxPizzas();
     burst(PIZZERIA.refillX, PIZZERIA.refillY, "#ffd25d", 18);
-    spawnText(PIZZERIA.refillX, PIZZERIA.refillY - 38, "RECARGA x2", "#f2a82f");
-    showToast("Mochila recargada: 2 pizzas");
+    spawnText(PIZZERIA.refillX, PIZZERIA.refillY - 38, `-${pizzaCost} 🪙`, "#f2a82f");
+    showToast(`Gastaste ${pizzaCost} monedas en ${pizzasToBuy} pizza${pizzasToBuy === 1 ? "" : "s"}`);
     sound("coin");
     updateHud();
   }
@@ -874,12 +923,7 @@ LEVELS.push({
     showToast(comboBonus ? `¡Pizza entregada! Combo +${comboBonus}` : "¡Pizza entregada! +200");
     sound("deliver");
 
-    if (delivered >= levelData.required) {
-      setTimeout(() => finishLevel(true), 520);
-      return;
-    }
-
-    currentTarget = findNextTarget(currentTarget);
+    if (delivered < levelData.required) currentTarget = findNextTarget(currentTarget);
     updateHud();
   }
 
@@ -950,9 +994,9 @@ LEVELS.push({
   function updateHud() {
     el.hudLevel.textContent = String(activeLevel + 1);
     el.hudTime.textContent = formatTime(timeLeft);
-    el.hudDeliveries.textContent = `${pizzasCarried}/${MAX_PIZZAS} · ${delivered}/${levelData.required}`;
+    el.hudDeliveries.textContent = `${pizzasCarried}/${maxPizzas()} · ${delivered}/${levelData.required}`;
     el.hudScore.textContent = String(score);
-    el.hudHearts.textContent = `${"♥ ".repeat(hearts)}${"♡ ".repeat(3 - hearts)}`.trim();
+    el.hudHearts.textContent = `${"♥ ".repeat(hearts)}${"♡ ".repeat(Math.max(0, maxHearts() - hearts))}`.trim();
     el.missionText.textContent = delivered >= levelData.required
       ? "¡Todas las pizzas fueron entregadas!"
       : pizzasCarried <= 0
@@ -1022,6 +1066,7 @@ LEVELS.push({
       drawTerrainDetails();
       drawPuddles();
       drawHouses();
+      drawShopBuilding();
       drawTrees();
       drawBenches();
       drawCoins();
@@ -1168,30 +1213,26 @@ LEVELS.push({
     }
 
     if (levelData.theme === "park") {
+      // Layered lake with a soft shoreline and animated water bands.
       ctx.fillStyle = "#d8c595";
       ctx.beginPath();
       ctx.ellipse(640, 245, 180, 110, 0, 0, Math.PI * 2);
       ctx.fill();
-      ctx.fillStyle = "#73bcd0";
+      const lake = ctx.createRadialGradient(610, 220, 12, 640, 245, 140);
+      lake.addColorStop(0, "#9ce4e1");
+      lake.addColorStop(.55, "#54b7c8");
+      lake.addColorStop(1, "#287caa");
+      ctx.fillStyle = lake;
       ctx.beginPath();
       ctx.ellipse(640, 245, 118, 67, 0, 0, Math.PI * 2);
       ctx.fill();
-      ctx.strokeStyle = "rgba(255,255,255,.45)";
-      ctx.lineWidth = 4;
-      ctx.beginPath();
-      ctx.ellipse(640, 245, 95, 50, 0, 0, Math.PI * 2);
-      ctx.stroke();
-
-      ctx.strokeStyle = "rgba(255,255,255,.5)";
+      ctx.strokeStyle = "rgba(225,255,246,.55)";
       ctx.lineWidth = 3;
-      ctx.beginPath();
-      ctx.arc(640, 245, 42 + Math.sin(animationClock * 1.8) * 4, 0, Math.PI * 2);
-      ctx.stroke();
-      fillRoundedRect(ctx, 548, 118, 184, 52, 18, "rgba(68,145,90,.8)");
-      ctx.fillStyle = "#fff7d7";
-      ctx.font = "900 18px Trebuchet MS";
-      ctx.textAlign = "center";
-      ctx.fillText("PARQUE", 640, 150);
+      for (let i = 0; i < 4; i += 1) {
+        ctx.beginPath();
+        ctx.ellipse(640, 215 + i * 20, 52 + i * 14, 10 + i * 3, 0, 0, Math.PI * 2);
+        ctx.stroke();
+      }
 
       drawLamp(470, 465);
       drawLamp(810, 465);
@@ -1202,15 +1243,11 @@ LEVELS.push({
       drawLamp(970, 252);
       drawLamp(310, 468);
       drawLamp(970, 468);
-      drawNeonSign(420, 255, "ABIERTO", "#65d9ff");
-      drawNeonSign(850, 468, "HOT", "#ff6f9a");
     } else {
       drawLamp(310, 252);
       drawLamp(970, 252);
       drawLamp(310, 468);
       drawLamp(970, 468);
-      drawYardSign(1030, 255, "2x1");
-      drawYardSign(230, 468, "META");
     }
 
     drawPizzeria();
@@ -1291,20 +1328,29 @@ LEVELS.push({
     }
     ctx.fillStyle = "rgba(61,34,39,.16)";
     fillRoundedRect(ctx, 8, 18, 208, 128, 16, "rgba(61,34,39,.18)");
-    fillRoundedRect(ctx, 0, 0, 205, 122, 14, levelData.theme === "night" ? "#4e4159" : "#f4d49e");
-    ctx.fillStyle = "#d85045";
-    ctx.beginPath();
-    ctx.moveTo(-10, 18);
-    ctx.lineTo(102, -34);
-    ctx.lineTo(215, 18);
-    ctx.closePath();
-    ctx.fill();
-    fillRoundedRect(ctx, 48, 55, 110, 42, 8, "#6c2e2e");
-    ctx.fillStyle = "#ffd65a";
-    ctx.font = "900 24px Nunito";
-    ctx.textAlign = "center";
-    ctx.fillText("PIZZA", 103, 84);
+    fillRoundedRect(ctx, 0, 0, 205, 122, 14, "#f2c27f");
+    ctx.fillStyle = "#b85b3d";
+    for (let row = 0; row < 5; row++) for (let column = 0; column < 7; column++) fillRoundedRect(ctx, 7 + column * 29 + (row % 2) * 7, 8 + row * 16, 23, 11, 3, "#d47750");
+    fillRoundedRect(ctx, 22, 34, 161, 31, 8, "#fff2c9");
+    ctx.fillStyle = "#b92f32"; ctx.font = "900 22px Nunito"; ctx.textAlign = "center"; ctx.fillText("🍕 PIZZERÍA", 103, 57);
+    fillRoundedRect(ctx, 26, 69, 63, 47, 6, "#79c6d2");
+    ctx.strokeStyle = "#fff4cf"; ctx.lineWidth = 4; ctx.strokeRect(31, 74, 53, 37);
+    fillRoundedRect(ctx, 99, 77, 48, 45, 5, "#713c35");
+    ctx.fillStyle = "#ffbd54"; ctx.beginPath(); ctx.arc(123, 101, 13, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "#ffd65a"; ctx.font = "900 13px Nunito"; ctx.fillText("PIZZA", 103, 140);
     ctx.restore();
+  }
+
+  function drawShopBuilding() {
+    const s = world?.shop; if (!s) return;
+    ctx.save(); ctx.translate(s.x, s.y);
+    fillRoundedRect(ctx, 6, 12, s.w, s.h, 12, "rgba(61,34,39,.2)");
+    fillRoundedRect(ctx, 0, 0, s.w, s.h, 10, "#8e5c9d");
+    ctx.fillStyle = "#e6a84f"; ctx.fillRect(-8, 0, s.w + 16, 27);
+    ctx.fillStyle = "#fff1b1"; ctx.font = "900 18px Nunito"; ctx.textAlign = "center"; ctx.fillText("MEJORAS", s.w / 2, 20);
+    fillRoundedRect(ctx, 16, 39, 62, 48, 5, "#68c4cf"); fillRoundedRect(ctx, 85, 50, 42, 62, 5, "#4b2d3b");
+    ctx.font = "22px sans-serif"; ctx.fillText("🛒", 47, 71); ctx.font = "18px sans-serif"; ctx.fillText("⚡ ♥", 106, 79);
+    ctx.fillStyle = "#ffd85f"; ctx.font = "900 13px Nunito"; ctx.fillText("SHOP", s.w / 2, s.h - 8); ctx.restore();
   }
 
   function drawPuddles() {
@@ -1459,9 +1505,11 @@ LEVELS.push({
 
   function drawTarget() {
     if (state !== "playing" || delivered >= levelData.required) return;
-    const house = world.houses[currentTarget];
-    const x = house.doorX;
-    const y = house.doorY - 42 + Math.sin(animationClock * 5) * 7;
+    const returningToPizzeria = pizzasCarried <= 0;
+    const house = returningToPizzeria ? null : world.houses[currentTarget];
+    const x = returningToPizzeria ? PIZZERIA.refillX : house.doorX;
+    const targetY = returningToPizzeria ? PIZZERIA.refillY : house.doorY;
+    const y = targetY - 42 + Math.sin(animationClock * 5) * 7;
 
     const pulse = 1 + Math.sin(animationClock * 4) * .08;
     ctx.save();
@@ -1497,20 +1545,20 @@ LEVELS.push({
       ctx.lineDashOffset = -animationClock * 42;
       ctx.beginPath();
       ctx.moveTo(player.x, player.y - 27);
-      const midY = isOnRoad(player.x, player.y, 12) ? player.y : house.doorY;
-      ctx.quadraticCurveTo((player.x + x) / 2, midY, x, house.doorY);
+      const midY = isOnRoad(player.x, player.y, 12) ? player.y : targetY;
+      ctx.quadraticCurveTo((player.x + x) / 2, midY, x, targetY);
       ctx.stroke();
       ctx.setLineDash([]);
       ctx.restore();
     }
 
-    const near = player && Math.hypot(player.x - house.doorX, player.y - house.doorY) < 85;
+    const near = player && Math.hypot(player.x - x, player.y - targetY) < 85;
     if (near) {
-      fillRoundedRect(ctx, x - 86, house.doorY + 12, 172, 35, 12, "rgba(36,22,47,.88)");
+      fillRoundedRect(ctx, x - 86, targetY + 12, 172, 35, 12, "rgba(36,22,47,.88)");
       ctx.fillStyle = "#fff";
       ctx.font = "800 15px Nunito";
       ctx.textAlign = "center";
-      ctx.fillText("E / ESPACIO · ENTREGAR", x, house.doorY + 35);
+      ctx.fillText(returningToPizzeria ? "PIZZERÍA · COMPRAR PIZZAS" : "E / ESPACIO · ENTREGAR", x, targetY + 35);
     }
   }
 
@@ -1640,6 +1688,7 @@ LEVELS.push({
       const bounce = Math.abs(Math.sin(cat.phase)) * 2;
       ctx.save();
       ctx.translate(cat.x, cat.y - bounce);
+      ctx.scale(1.25, 1.25);
       if (cat.dir < 0) ctx.scale(-1, 1);
 
       ctx.fillStyle = "rgba(48,28,33,.18)";
@@ -1647,7 +1696,9 @@ LEVELS.push({
       ctx.ellipse(0, 14, 18, 5, 0, 0, Math.PI * 2);
       ctx.fill();
 
-      ctx.fillStyle = "#d58a43";
+      const fur = "#c9793d";
+      const stripe = "#7b3f32";
+      ctx.fillStyle = fur;
       ctx.beginPath();
       ctx.ellipse(0, 0, 14, 10, 0, 0, Math.PI * 2);
       ctx.fill();
@@ -1662,6 +1713,24 @@ LEVELS.push({
       ctx.lineTo(19, -19);
       ctx.lineTo(21, -9);
       ctx.fill();
+      ctx.fillStyle = stripe;
+      ctx.fillRect(-8, -8, 3, 8);
+      ctx.fillRect(-1, -10, 3, 9);
+      ctx.fillRect(6, -8, 3, 7);
+      ctx.fillStyle = "#f1b56a";
+      ctx.beginPath();
+      ctx.arc(16, -6, 2.2, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = "#30202b";
+      ctx.beginPath();
+      ctx.arc(16.5, -6, .9, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = "#5b302d";
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(19, -2); ctx.lineTo(27, -4);
+      ctx.moveTo(19, 0); ctx.lineTo(27, 1);
+      ctx.stroke();
       ctx.strokeStyle = "#d58a43";
       ctx.lineWidth = 5;
       ctx.beginPath();
@@ -1894,6 +1963,30 @@ LEVELS.push({
     });
   }
 
+  let shopSelection = 0;
+  function refreshShop() {
+    const upgrades = getUpgrades();
+    ["speed", "capacity", "health"].forEach((type, index) => {
+      const button = el[`${type}UpgradeBtn`];
+      const price = SHOP_COSTS[type] * (upgrades[type] + 1);
+      button.querySelector("b").textContent = `${price} 🪙`;
+      button.disabled = score < price;
+      button.classList.toggle("is-selected", shopSelection === index);
+    });
+  }
+  function openShop() { state = "shop"; showOnly(el.shop); refreshShop(); }
+  function closeShop() { state = "playing"; showOnly(null); updateHud(); }
+  function buyUpgrade(type) {
+    const upgrades = getUpgrades();
+    const price = SHOP_COSTS[type] * (upgrades[type] + 1);
+    if (score < price) return;
+    score -= price; upgrades[type] += 1;
+    localStorage.setItem("pizzaDashUpgrades", JSON.stringify(upgrades));
+    if (type === "speed" && player) player.speed += 25;
+    if (type === "health") hearts += 1;
+    updateHud(); refreshShop();
+  }
+
   bindButton("playBtn", openLevelSelect);
   bindButton("howBtn", openHow);
   bindButton("closeHowBtn", openMenu);
@@ -1902,8 +1995,10 @@ LEVELS.push({
   bindButton("resumeBtn", togglePause);
   bindButton("pauseMenuBtn", openMenu);
   bindButton("resultMenuBtn", openMenu);
-  bindButton("retryBtn", () => beginLevel(activeLevel));
+  bindButton("retryBtn", () => { resetUpgrades(); beginLevel(activeLevel); });
   bindButton("nextBtn", () => beginLevel(Math.min(activeLevel + 1, LEVELS.length - 1)));
+  bindButton("closeShopBtn", closeShop);
+  ["speed", "capacity", "health"].forEach(type => el[`${type}UpgradeBtn`].addEventListener("click", () => buyUpgrade(type)));
 
   el.pauseBtn.addEventListener("click", () => {
     sound("click");
@@ -1913,7 +2008,8 @@ LEVELS.push({
   el.soundBtn.addEventListener("click", () => {
     audioEnabled = !audioEnabled;
     el.soundBtn.textContent = audioEnabled ? "🔊" : "🔇";
-    if (audioEnabled) sound("click");
+    if (audioEnabled) { sound("click"); startMusic(); }
+    else stopMusic();
   });
 
   document.querySelectorAll(".level-card").forEach(card => {
@@ -1928,11 +2024,22 @@ LEVELS.push({
 
   window.addEventListener("keydown", event => {
     const code = event.code;
+    if (state === "shop") {
+      if (["ArrowLeft", "KeyA", "ArrowUp", "KeyW"].includes(code)) shopSelection = (shopSelection + 2) % 3;
+      if (["ArrowRight", "KeyD", "ArrowDown", "KeyS"].includes(code)) shopSelection = (shopSelection + 1) % 3;
+      if (["Enter", "Space"].includes(code)) buyUpgrade(["speed", "capacity", "health"][shopSelection]);
+      if (code === "Escape") closeShop();
+      event.preventDefault(); refreshShop(); return;
+    }
     const gameKeys = ["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space","KeyW","KeyA","KeyS","KeyD","KeyE","ShiftLeft","ShiftRight"];
     if (gameKeys.includes(code)) event.preventDefault();
 
     keys.add(code);
-    if ((code === "Space" || code === "KeyE") && !event.repeat) attemptDelivery();
+    if ((code === "Space" || code === "KeyE" || code === "Enter") && !event.repeat) {
+      const shop = world?.shop;
+      if (shop && Math.hypot(player.x - shop.doorX, player.y - shop.doorY) < 86) openShop();
+      else attemptDelivery();
+    }
     if (code === "Escape") {
       if (state === "playing" || state === "paused") togglePause();
     }

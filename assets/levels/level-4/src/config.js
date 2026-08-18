@@ -37,7 +37,7 @@ export const LEVELS = [{
   start: { x: 632, y: 360 }
 }, {
   name: "Zona Industrial",
-  duration: 125,
+  duration: 55,
   required: 6,
   traffic: 180,
   theme: "industrial",

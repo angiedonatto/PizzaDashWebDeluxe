@@ -1,6 +1,6 @@
-import { LEVELS, LEVEL_URLS, MAX_PIZZAS, PIZZERIA, RIVAL_PIZZERIA } from "./src/config.js?v=industrial-buildings-1";
-import { createAudio } from "./src/audio.js?v=industrial-buildings-1";
-import { createRenderer } from "./src/rendering.js?v=industrial-buildings-1";
+import { LEVELS, LEVEL_URLS, MAX_PIZZAS, PIZZERIA, RIVAL_PIZZERIA } from "./src/config.js?v=final-tuning-1";
+import { createAudio } from "./src/audio.js?v=final-tuning-1";
+import { createRenderer } from "./src/rendering.js?v=final-tuning-1";
 (() => {
   "use strict";
 
@@ -66,6 +66,7 @@ import { createRenderer } from "./src/rendering.js?v=industrial-buildings-1";
   let levelIntroTimer = 0;
   let rival = null;
   let stormTimer = 0;
+  let levelElapsed = 0;
   let pauseToggleGuard = 0;
   let mobileSprintActive = false;
   let lastMobileDirectionTapAt = 0;
@@ -398,6 +399,7 @@ import { createRenderer } from "./src/rendering.js?v=industrial-buildings-1";
     const benches = [];
     const puddles = [];
     const cats = [];
+    const dogs = [];
 
     const treeSpots = theme === "industrial"
       ? [[390, 110], [770, 110], [390, 405], [770, 405], [390, 650], [770, 650], [1120, 300]]
@@ -432,6 +434,7 @@ import { createRenderer } from "./src/rendering.js?v=industrial-buildings-1";
     if (theme === "industrial") {
       puddles.push({ x: 470, y: 270, rx: 38, ry: 14 }, { x: 780, y: 535, rx: 42, ry: 15 });
       cats.push(makeCat(430, 270, 58, "x"));
+      dogs.push(makeDog(760, 270, 52, "x"), makeDog(820, 535, 48, "x"));
     } else if (theme === "park") {
       benches.push({ x: 315, y: 265, w: 88, h: 26 });
       benches.push({ x: 875, y: 265, w: 88, h: 26 });
@@ -458,6 +461,11 @@ import { createRenderer } from "./src/rendering.js?v=industrial-buildings-1";
       ? [[284, 244], [1002, 248], [204, 462], [1036, 462], [636, 248], [636, 470]]
       : [[330, 245], [950, 250], [330, 460], [950, 460], [630, 250], [630, 470]];
     const coins = coinSpots.map(([x, y]) => ({ x, y, taken: false, phase: rand(0, 6.2) }));
+    const heartSpots = [[430, 270], [760, 270], [430, 535], [760, 535], [635, 145], [635, 625]];
+    const heartSpot = heartSpots[Math.floor(rand(0, heartSpots.length))];
+    const heart = theme === "industrial"
+      ? { x: heartSpot[0], y: heartSpot[1], active: false, collected: false, phase: rand(0, 6.2) }
+      : null;
 
     const flowerSeed = [];
     const detailCount = theme === "night" ? 46 : 64;
@@ -482,11 +490,13 @@ import { createRenderer } from "./src/rendering.js?v=industrial-buildings-1";
       benches,
       puddles,
       cats,
+      dogs,
       cars: traffic.cars,
       trafficSpawns: traffic.spawns,
       trafficReservations: [],
       trafficClock: 0,
       coins,
+      heart,
       flowerSeed,
       crosswalks,
       intersections,
@@ -794,7 +804,7 @@ import { createRenderer } from "./src/rendering.js?v=industrial-buildings-1";
 
   function createTraffic(roads, levelIndex, intersections) {
     const colors = ["#e75245", "#477ec2", "#f2b640", "#7b55b7", "#48a56a", "#e57a3c", "#40a9a8"];
-    const multiplier = levelIndex === 0 ? 1 : levelIndex === 1 ? 1.08 : 1.28;
+    const multiplier = levelIndex === 0 ? 1 : levelIndex === 1 ? 1.08 : levelIndex === 2 ? 1.28 : 1.58976;
     const horizontal = roads.find(road => road.axis === "x");
     const vertical = roads.find(road => road.axis === "y");
     if (!horizontal || !vertical) return { cars: [], spawns: [] };
@@ -879,6 +889,10 @@ import { createRenderer } from "./src/rendering.js?v=industrial-buildings-1";
       );
     }
 
+    if (levelIndex === 3) {
+      laneSpecs.forEach(spec => { spec.interval *= .72; });
+    }
+
     const spawns = laneSpecs.map((spec, index) => {
       const route = buildSmoothRoute(spec.waypoints);
       const first = route[0];
@@ -931,6 +945,10 @@ import { createRenderer } from "./src/rendering.js?v=industrial-buildings-1";
     };
   }
 
+  function makeDog(x, y, range, axis) {
+    return { x, y, baseX: x, baseY: y, range, axis, dir: Math.random() > .5 ? 1 : -1, speed: 56.16, phase: rand(0, 6.2) };
+  }
+
   function beginLevel(index) {
     clearTimeout(autoAdvanceTimer);
     activeLevel = index;
@@ -955,6 +973,7 @@ import { createRenderer } from "./src/rendering.js?v=industrial-buildings-1";
     rival = createRival(index);
     stormTimer = levelData.mode === "stormRace" ? 6.5 : 0;
     timeLeft = levelData.duration;
+    levelElapsed = 0;
     delivered = 0;
     score = 0;
     hearts = 3;
@@ -1350,6 +1369,7 @@ import { createRenderer } from "./src/rendering.js?v=industrial-buildings-1";
     }
 
     timeLeft -= dt;
+    levelElapsed += dt;
     levelIntroTimer = Math.max(0, levelIntroTimer - dt);
     invulnerable = Math.max(0, invulnerable - dt);
     actionCooldown = Math.max(0, actionCooldown - dt);
@@ -1409,7 +1429,9 @@ import { createRenderer } from "./src/rendering.js?v=industrial-buildings-1";
 
     updateCars(dt);
     updateCats(dt);
+    updateDogs(dt);
     updateCoins();
+    updateHeart();
     updatePizzeriaRefill();
     updateRival(dt);
     updateLightning(dt);
@@ -1488,6 +1510,27 @@ import { createRenderer } from "./src/rendering.js?v=industrial-buildings-1";
     }
   }
 
+  function updateDogs(dt) {
+    for (const dog of world.dogs || []) {
+      if (dog.axis === "x") dog.x += dog.dir * dog.speed * dt;
+      else dog.y += dog.dir * dog.speed * dt;
+      const position = dog.axis === "x" ? dog.x : dog.y;
+      const base = dog.axis === "x" ? dog.baseX : dog.baseY;
+      if (Math.abs(position - base) > dog.range) dog.dir *= -1;
+      dog.phase += dt * 8;
+      if (invulnerable <= 0 && Math.hypot(player.x - dog.x, player.y - dog.y) < player.r + 16) {
+        hearts -= 1;
+        invulnerable = 1.25;
+        player.bump = 1;
+        screenShake = 1;
+        spawnText(player.x, player.y - 32, "-1 vida", "#ef4038");
+        burst(player.x, player.y, "#d97845", 14);
+        showToast("¡Cuidado con los perros!");
+        sound("crash");
+      }
+    }
+  }
+
   function hitPlayer(car) {
     hearts -= 1;
     timeLeft = Math.max(0, timeLeft - 4);
@@ -1523,6 +1566,22 @@ import { createRenderer } from "./src/rendering.js?v=industrial-buildings-1";
         spawnText(coin.x, coin.y - 28, "+50", "#f2a82f");
         sound("coin");
       }
+    }
+  }
+
+  function updateHeart() {
+    const heart = world.heart;
+    if (!heart || heart.collected) return;
+    if (!heart.active) {
+      heart.active = levelElapsed >= 8;
+      return;
+    }
+    if (Math.hypot(player.x - heart.x, player.y - heart.y) < player.r + 18) {
+      heart.collected = true;
+      hearts = Math.min(3, hearts + 1);
+      burst(heart.x, heart.y, "#ff6f91", 18);
+      spawnText(heart.x, heart.y - 30, hearts === 3 ? "¡Vida al máximo!" : "+1 vida", "#ff7895");
+      sound("coin");
     }
   }
 

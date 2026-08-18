@@ -1,6 +1,6 @@
-import { LEVELS, LEVEL_URLS, MAX_PIZZAS, PIZZERIA, RIVAL_PIZZERIA } from "./src/config.js?v=final-tuning-1";
-import { createAudio } from "./src/audio.js?v=final-tuning-1";
-import { createRenderer } from "./src/rendering.js?v=final-tuning-1";
+import { LEVELS, LEVEL_URLS, MAX_PIZZAS, PIZZERIA, RIVAL_PIZZERIA } from "./src/config.js?v=cat-pizza-2";
+import { createAudio } from "./src/audio.js?v=cat-pizza-2";
+import { createRenderer } from "./src/rendering.js?v=cat-pizza-2";
 (() => {
   "use strict";
 
@@ -433,7 +433,7 @@ import { createRenderer } from "./src/rendering.js?v=final-tuning-1";
 
     if (theme === "industrial") {
       puddles.push({ x: 470, y: 270, rx: 38, ry: 14 }, { x: 780, y: 535, rx: 42, ry: 15 });
-      cats.push(makeCat(430, 270, 58, "x"));
+      cats.push(makeCat(430, 270, 58, "x"), makeCat(430, 535, 58, "x"));
       dogs.push(makeDog(760, 270, 52, "x"), makeDog(820, 535, 48, "x"));
     } else if (theme === "park") {
       benches.push({ x: 315, y: 265, w: 88, h: 26 });
@@ -1500,7 +1500,13 @@ import { createRenderer } from "./src/rendering.js?v=final-tuning-1";
         player.bump = 1;
         invulnerable = .65;
         timeLeft = Math.max(0, timeLeft - 1.5);
-        spawnText(player.x, player.y - 28, "¡Miau!", "#5b3140");
+        if (pizzasCarried > 0) {
+          pizzasCarried -= 1;
+          spawnText(player.x, player.y - 28, "¡El gato robó una pizza!", "#5b3140");
+          showToast("¡El gato se llevó una pizza!");
+        } else {
+          spawnText(player.x, player.y - 28, "¡Miau!", "#5b3140");
+        }
         burst(player.x, player.y, "#f5c071", 7);
       }
       if (rival && Math.hypot(rival.x - cat.x, rival.y - cat.y) < rival.r + 13) {

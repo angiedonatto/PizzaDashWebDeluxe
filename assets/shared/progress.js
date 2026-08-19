@@ -13,7 +13,7 @@
   }
 
   function refreshLevelStars() {
-    for (let index = 0; index < 3; index++) {
+    for (let index = 0; index < 4; index++) {
       const value = Number(localStorage.getItem(`pizzaDashStars${index}`) || 0);
       const node = document.getElementById(`stars-${index}`);
       if (node) node.textContent = `${"★ ".repeat(value)}${"☆ ".repeat(3 - value)}`.trim();

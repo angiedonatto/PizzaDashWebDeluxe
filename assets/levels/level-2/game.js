@@ -40,7 +40,7 @@ LEVELS.push({
 (() => {
   "use strict";
 
-  const LEVEL_URLS = ["../level-1/", "../level-2/", "../level-3/"];
+  const LEVEL_URLS = ["../level-1/", "../level-2/", "../level-3/", "../level-4/"];
 
   const canvas = document.getElementById("gameCanvas");
   const ctx = canvas.getContext("2d");
@@ -108,7 +108,7 @@ LEVELS.push({
   const particles = [];
   const floatTexts = [];
   const MAX_PIZZAS = 2;
-  const PIZZERIA = { x: 12, y: 527, w: 205, h: 122, refillX: 114, refillY: 585, radius: 88 };
+  const PIZZERIA = { x: 310, y: 340, w: 168, h: 100, refillX: 395, refillY: 446, radius: 52 };
 
   const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
   const lerp = (a, b, t) => a + (b - a) * t;
@@ -1289,21 +1289,19 @@ LEVELS.push({
       ctx.setLineDash([]);
       ctx.restore();
     }
+    ctx.scale(.82, .82);
     ctx.fillStyle = "rgba(61,34,39,.16)";
     fillRoundedRect(ctx, 8, 18, 208, 128, 16, "rgba(61,34,39,.18)");
-    fillRoundedRect(ctx, 0, 0, 205, 122, 14, levelData.theme === "night" ? "#4e4159" : "#f4d49e");
-    ctx.fillStyle = "#d85045";
-    ctx.beginPath();
-    ctx.moveTo(-10, 18);
-    ctx.lineTo(102, -34);
-    ctx.lineTo(215, 18);
-    ctx.closePath();
-    ctx.fill();
-    fillRoundedRect(ctx, 48, 55, 110, 42, 8, "#6c2e2e");
-    ctx.fillStyle = "#ffd65a";
-    ctx.font = "900 24px Nunito";
-    ctx.textAlign = "center";
-    ctx.fillText("PIZZA", 103, 84);
+    fillRoundedRect(ctx, 0, 0, 205, 122, 14, "#f2c27f");
+    ctx.fillStyle = "#b85b3d";
+    for (let row = 0; row < 5; row++) for (let column = 0; column < 7; column++) fillRoundedRect(ctx, 7 + column * 29 + (row % 2) * 7, 8 + row * 16, 23, 11, 3, "#d47750");
+    fillRoundedRect(ctx, 22, 34, 161, 31, 8, "#fff2c9");
+    ctx.fillStyle = "#b92f32"; ctx.font = "900 22px Nunito"; ctx.textAlign = "center"; ctx.fillText("🍕 PIZZERÍA", 103, 57);
+    fillRoundedRect(ctx, 26, 69, 63, 47, 6, "#79c6d2");
+    ctx.strokeStyle = "#fff4cf"; ctx.lineWidth = 4; ctx.strokeRect(31, 74, 53, 37);
+    fillRoundedRect(ctx, 99, 77, 48, 45, 5, "#713c35");
+    ctx.fillStyle = "#ffbd54"; ctx.beginPath(); ctx.arc(123, 101, 13, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "#ffd65a"; ctx.font = "900 13px Nunito"; ctx.fillText("PIZZA", 103, 140);
     ctx.restore();
   }
 

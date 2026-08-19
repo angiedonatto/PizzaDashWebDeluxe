@@ -352,12 +352,12 @@ import { createRenderer } from "./src/rendering.js?v=cat-pizza-2";
 
     const houses = theme === "industrial"
       ? [
-          makeHouse(42, 42, 330, 145, "#c98259", "#8d4d45", 205, 205),
-          makeHouse(790, 42, 350, 145, "#b97557", "#754955", 965, 205),
-          makeHouse(42, 350, 330, 108, "#d29461", "#985342", 205, 470),
-          makeHouse(790, 350, 350, 108, "#c17b58", "#704858", 965, 470),
-          makeHouse(220, 635, 150, 62, "#b86d50", "#814646", 295, 628),
-          makeHouse(790, 615, 350, 82, "#ce875b", "#754552", 965, 606)
+          makeHouse(42, 30, 330, 140, "#c98259", "#8d4d45", 205, 191),
+          makeHouse(812, 30, 350, 140, "#b97557", "#754955", 987, 191),
+          makeHouse(42, 377, 330, 60, "#d29461", "#985342", 205, 456),
+          makeHouse(812, 377, 350, 60, "#c17b58", "#704858", 987, 456),
+          makeHouse(220, 650, 150, 47, "#b86d50", "#814646", 295, 626),
+          makeHouse(812, 646, 350, 51, "#ce875b", "#754552", 987, 626)
         ]
       : theme === "night"
       ? [
@@ -388,7 +388,7 @@ import { createRenderer } from "./src/rendering.js?v=cat-pizza-2";
 
     if (theme === "night") houses.forEach(house => house.night = true);
 
-    const obstacles = houses.flatMap(makeHouseObstacles);
+    const obstacles = houses.flatMap(theme === "industrial" ? makeIndustrialBuildingObstacles : makeHouseObstacles);
     if (theme === "night") {
       obstacles.push(
         { x: PIZZERIA.x + 8, y: PIZZERIA.y + 8, w: PIZZERIA.w - 16, h: PIZZERIA.h - 6, type: "pizzeria" },
@@ -432,9 +432,9 @@ import { createRenderer } from "./src/rendering.js?v=cat-pizza-2";
     });
 
     if (theme === "industrial") {
-      puddles.push({ x: 470, y: 270, rx: 38, ry: 14 }, { x: 780, y: 535, rx: 42, ry: 15 });
-      cats.push(makeCat(430, 270, 58, "x"), makeCat(430, 535, 58, "x"));
-      dogs.push(makeDog(760, 270, 52, "x"), makeDog(820, 535, 48, "x"));
+      puddles.push({ x: 450, y: 266, rx: 38, ry: 14 }, { x: 830, y: 538, rx: 42, ry: 15 });
+      cats.push(makeCat(428, 266, 50, "x"), makeCat(862, 538, 48, "x"));
+      dogs.push(makeDog(758, 266, 48, "x"), makeDog(842, 538, 44, "x"));
     } else if (theme === "park") {
       benches.push({ x: 315, y: 265, w: 88, h: 26 });
       benches.push({ x: 875, y: 265, w: 88, h: 26 });
@@ -456,12 +456,14 @@ import { createRenderer } from "./src/rendering.js?v=cat-pizza-2";
     }
 
     const coinSpots = theme === "industrial"
-      ? [[430, 268], [790, 268], [430, 533], [790, 533], [635, 150], [635, 620]]
+      ? [[438, 266], [805, 266], [438, 538], [805, 538], [635, 150], [635, 620]]
       : theme === "night"
       ? [[284, 244], [1002, 248], [204, 462], [1036, 462], [636, 248], [636, 470]]
       : [[330, 245], [950, 250], [330, 460], [950, 460], [630, 250], [630, 470]];
     const coins = coinSpots.map(([x, y]) => ({ x, y, taken: false, phase: rand(0, 6.2) }));
-    const heartSpots = [[430, 270], [760, 270], [430, 535], [760, 535], [635, 145], [635, 625]];
+    const heartSpots = theme === "industrial"
+      ? [[455, 266], [782, 266], [455, 538], [782, 538], [635, 150], [635, 620]]
+      : [[430, 270], [760, 270], [430, 535], [760, 535], [635, 145], [635, 625]];
     const heartSpot = heartSpots[Math.floor(rand(0, heartSpots.length))];
     const heart = theme === "industrial"
       ? { x: heartSpot[0], y: heartSpot[1], active: false, collected: false, phase: rand(0, 6.2) }
@@ -532,6 +534,21 @@ import { createRenderer } from "./src/rendering.js?v=cat-pizza-2";
     const leftShrub = { x: house.x + 2, y: house.y + house.h - 24, w: 34, h: 30, type: "yard" };
     const rightShrub = { x: house.x + house.w - 36, y: house.y + house.h - 24, w: 34, h: 30, type: "yard" };
     return [roof, body, leftShrub, rightShrub];
+  }
+
+  function makeIndustrialBuildingObstacles(house) {
+    const entranceAbove = house.doorY < house.y;
+    const sidewalkClearance = 24;
+    const y = entranceAbove ? house.doorY + sidewalkClearance : house.y - 12;
+    const bottom = entranceAbove ? house.y + house.h - 4 : house.doorY - sidewalkClearance;
+    const h = bottom - y;
+    return [{
+      x: house.x + 5,
+      y,
+      w: house.w - 10,
+      h: Math.max(44, h),
+      type: "industrialBuilding"
+    }];
   }
 
   function makeCar(spawn, color, speed, id) {
@@ -941,12 +958,13 @@ import { createRenderer } from "./src/rendering.js?v=cat-pizza-2";
       x, y, baseX: x, baseY: y, range, axis,
       dir: Math.random() > .5 ? 1 : -1,
       speed: rand(32, 48),
-      phase: rand(0, 6.2)
+      phase: rand(0, 6.2),
+      stunned: 0
     };
   }
 
   function makeDog(x, y, range, axis) {
-    return { x, y, baseX: x, baseY: y, range, axis, dir: Math.random() > .5 ? 1 : -1, speed: 56.16, phase: rand(0, 6.2) };
+    return { x, y, baseX: x, baseY: y, range, axis, dir: Math.random() > .5 ? 1 : -1, speed: 56.16, phase: rand(0, 6.2), stunned: 0 };
   }
 
   function beginLevel(index) {
@@ -1471,11 +1489,32 @@ import { createRenderer } from "./src/rendering.js?v=cat-pizza-2";
       if (rival && circleRectCollision(rival, hitbox)) {
         hitRival(car);
       }
+      for (const cat of world.cats) {
+        if (cat.stunned > 0) continue;
+        if (circleRectCollision({ x: cat.x, y: cat.y, r: 13 }, hitbox)) {
+          scareAnimalFromCar(cat, car, 13, "#d58a43", "¡MIAU!");
+        }
+      }
+      for (const dog of world.dogs || []) {
+        if (dog.stunned > 0) continue;
+        if (circleRectCollision({ x: dog.x, y: dog.y, r: 16 }, hitbox)) {
+          scareAnimalFromCar(dog, car, 16, "#a9653e", "¡GUAU!");
+        }
+      }
     }
   }
 
   function updateCats(dt) {
     for (const cat of world.cats) {
+      if (cat.stunned > 0) {
+        cat.stunned -= dt;
+        if (cat.stunned <= 0) {
+          cat.x = cat.baseX;
+          cat.y = cat.baseY;
+          cat.dir *= -1;
+        }
+        continue;
+      }
       if (cat.axis === "x") {
         cat.x += cat.dir * cat.speed * dt;
         if (Math.abs(cat.x - cat.baseX) > cat.range) {
@@ -1516,8 +1555,38 @@ import { createRenderer } from "./src/rendering.js?v=cat-pizza-2";
     }
   }
 
+  function scareAnimalFromCar(animal, car, radius, color, label) {
+    animal.stunned = .45;
+    const horizontal = Math.abs(car.dx) >= Math.abs(car.dy);
+    if (horizontal) {
+      const side = animal.y < car.cy ? -1 : 1;
+      animal.baseY = clamp(car.cy + side * (car.h / 2 + radius + 34), 92, H - 42);
+      animal.baseX = clamp(animal.x - car.dx * 76, 42, W - 42);
+      animal.axis = "x";
+    } else {
+      const side = animal.x < car.cx ? -1 : 1;
+      animal.baseX = clamp(car.cx + side * (car.w / 2 + radius + 34), 42, W - 42);
+      animal.baseY = clamp(animal.y - car.dy * 76, 92, H - 42);
+      animal.axis = "y";
+    }
+    animal.range = Math.min(animal.range, 38);
+    animal.x = animal.baseX;
+    animal.y = animal.baseY;
+    burst(animal.x, animal.y, color, 10);
+    spawnText(animal.x, animal.y - 26, label, "#7a4329");
+  }
+
   function updateDogs(dt) {
     for (const dog of world.dogs || []) {
+      if (dog.stunned > 0) {
+        dog.stunned -= dt;
+        if (dog.stunned <= 0) {
+          dog.x = dog.baseX;
+          dog.y = dog.baseY;
+          dog.dir *= -1;
+        }
+        continue;
+      }
       if (dog.axis === "x") dog.x += dog.dir * dog.speed * dt;
       else dog.y += dog.dir * dog.speed * dt;
       const position = dog.axis === "x" ? dog.x : dog.y;

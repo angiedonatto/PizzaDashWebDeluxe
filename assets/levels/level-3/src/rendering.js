@@ -305,20 +305,17 @@ export function createRenderer(deps) {
       ctx.restore();
     }
     ctx.fillStyle = "rgba(61,34,39,.16)";
-    fillRoundedRect(ctx, 8, 16, PIZZERIA.w, PIZZERIA.h + 18, 14, "rgba(61,34,39,.18)");
-    fillRoundedRect(ctx, 0, 0, PIZZERIA.w, PIZZERIA.h, 12, levelData.theme === "night" ? "#4e4159" : "#f4d49e");
-    ctx.fillStyle = "#d85045";
-    ctx.beginPath();
-    ctx.moveTo(-8, 14);
-    ctx.lineTo(PIZZERIA.w / 2, -24);
-    ctx.lineTo(PIZZERIA.w + 8, 14);
-    ctx.closePath();
-    ctx.fill();
-    fillRoundedRect(ctx, 27, 38, 82, 31, 7, "#6c2e2e");
-    ctx.fillStyle = "#ffd65a";
-    ctx.font = "900 18px Nunito";
-    ctx.textAlign = "center";
-    ctx.fillText("PIZZA", PIZZERIA.w / 2, 60);
+    fillRoundedRect(ctx, 8, 18, 208, 128, 16, "rgba(61,34,39,.18)");
+    fillRoundedRect(ctx, 0, 0, 205, 122, 14, "#f2c27f");
+    ctx.fillStyle = "#b85b3d";
+    for (let row = 0; row < 5; row++) for (let column = 0; column < 7; column++) fillRoundedRect(ctx, 7 + column * 29 + (row % 2) * 7, 8 + row * 16, 23, 11, 3, "#d47750");
+    fillRoundedRect(ctx, 22, 34, 161, 31, 8, "#fff2c9");
+    ctx.fillStyle = "#b92f32"; ctx.font = "900 22px Nunito"; ctx.textAlign = "center"; ctx.fillText("🍕 PIZZERÍA", 103, 57);
+    fillRoundedRect(ctx, 26, 69, 63, 47, 6, "#79c6d2");
+    ctx.strokeStyle = "#fff4cf"; ctx.lineWidth = 4; ctx.strokeRect(31, 74, 53, 37);
+    fillRoundedRect(ctx, 99, 77, 48, 45, 5, "#713c35");
+    ctx.fillStyle = "#ffbd54"; ctx.beginPath(); ctx.arc(123, 101, 13, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "#ffd65a"; ctx.font = "900 13px Nunito"; ctx.fillText("PIZZA", 103, 140);
     ctx.restore();
   }
 

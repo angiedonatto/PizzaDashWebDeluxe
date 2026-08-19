@@ -235,6 +235,13 @@ export function createRenderer(deps) {
       drawLamp(970, 252);
       drawLamp(310, 468);
       drawLamp(970, 468);
+    } else if (levelData.theme === "industrial") {
+      drawLamp(416, 188);
+      drawLamp(842, 188);
+      drawLamp(416, 452);
+      drawLamp(842, 452);
+      drawLamp(416, 626);
+      drawLamp(842, 626);
     } else {
       drawLamp(310, 252);
       drawLamp(970, 252);
@@ -306,21 +313,19 @@ export function createRenderer(deps) {
       ctx.setLineDash([]);
       ctx.restore();
     }
+    ctx.scale(.82, .82);
     ctx.fillStyle = "rgba(61,34,39,.16)";
-    fillRoundedRect(ctx, 8, 16, PIZZERIA.w, PIZZERIA.h + 18, 14, "rgba(61,34,39,.18)");
-    fillRoundedRect(ctx, 0, 0, PIZZERIA.w, PIZZERIA.h, 12, levelData.theme === "night" ? "#4e4159" : "#f4d49e");
-    ctx.fillStyle = "#d85045";
-    ctx.beginPath();
-    ctx.moveTo(-8, 14);
-    ctx.lineTo(PIZZERIA.w / 2, -24);
-    ctx.lineTo(PIZZERIA.w + 8, 14);
-    ctx.closePath();
-    ctx.fill();
-    fillRoundedRect(ctx, 27, 38, 82, 31, 7, "#6c2e2e");
-    ctx.fillStyle = "#ffd65a";
-    ctx.font = "900 18px Nunito";
-    ctx.textAlign = "center";
-    ctx.fillText("PIZZA", PIZZERIA.w / 2, 60);
+    fillRoundedRect(ctx, 8, 18, 208, 128, 16, "rgba(61,34,39,.18)");
+    fillRoundedRect(ctx, 0, 0, 205, 122, 14, "#f2c27f");
+    ctx.fillStyle = "#b85b3d";
+    for (let row = 0; row < 5; row++) for (let column = 0; column < 7; column++) fillRoundedRect(ctx, 7 + column * 29 + (row % 2) * 7, 8 + row * 16, 23, 11, 3, "#d47750");
+    fillRoundedRect(ctx, 22, 34, 161, 31, 8, "#fff2c9");
+    ctx.fillStyle = "#b92f32"; ctx.font = "900 22px Nunito"; ctx.textAlign = "center"; ctx.fillText("🍕 PIZZERÍA", 103, 57);
+    fillRoundedRect(ctx, 26, 69, 63, 47, 6, "#79c6d2");
+    ctx.strokeStyle = "#fff4cf"; ctx.lineWidth = 4; ctx.strokeRect(31, 74, 53, 37);
+    fillRoundedRect(ctx, 99, 77, 48, 45, 5, "#713c35");
+    ctx.fillStyle = "#ffbd54"; ctx.beginPath(); ctx.arc(123, 101, 13, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "#ffd65a"; ctx.font = "900 13px Nunito"; ctx.fillText("PIZZA", 103, 140);
     ctx.restore();
   }
 
@@ -428,8 +433,7 @@ export function createRenderer(deps) {
   }
 
   function drawIndustrialBuilding(h, index) {
-    ctx.fillStyle = "rgba(45, 28, 35, .25)";
-    fillRoundedRect(ctx, 8, 10, h.w, h.h + 8, 8, "rgba(45, 28, 35, .25)");
+    fillRoundedRect(ctx, 8, 8, h.w, h.h + 5, 8, "rgba(45, 28, 35, .18)");
     fillRoundedRect(ctx, 0, 0, h.w, h.h, 7, h.wall);
 
     ctx.fillStyle = h.roof;
@@ -754,6 +758,7 @@ export function createRenderer(deps) {
 
   function drawCats() {
     for (const cat of world.cats) {
+      if (cat.stunned > 0) continue;
       const bounce = Math.abs(Math.sin(cat.phase)) * 2;
       ctx.save();
       ctx.translate(cat.x, cat.y - bounce);
@@ -790,6 +795,7 @@ export function createRenderer(deps) {
 
   function drawDogs() {
     for (const dog of world?.dogs || []) {
+      if (dog.stunned > 0) continue;
       const bounce = Math.abs(Math.sin(dog.phase)) * 2;
       ctx.save();
       ctx.translate(dog.x, dog.y - bounce);

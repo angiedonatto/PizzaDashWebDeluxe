@@ -55,13 +55,13 @@ export const LEVEL_URLS = ["../level-1/", "../level-2/", "../level-3/", "../leve
 export const MAX_PIZZAS = 2;
 
 export const PIZZERIA = {
-  x: 34,
-  y: 556,
-  w: 136,
-  h: 82,
-  refillX: 102,
-  refillY: 648,
-  radius: 58
+  x: 12,
+  y: 598,
+  w: 168,
+  h: 100,
+  refillX: 96,
+  refillY: 652,
+  radius: 52
 };
 
 export const RIVAL_PIZZERIA = {

@@ -48,9 +48,11 @@ export function createRenderer(deps) {
       drawTrees();
       drawBenches();
       drawCoins();
+      drawHeart();
       drawTarget();
       drawLightning();
       drawCats();
+      drawDogs();
       drawCars();
     }
     if (rival) drawRival();
@@ -233,7 +235,7 @@ export function createRenderer(deps) {
       drawLamp(970, 252);
       drawLamp(310, 468);
       drawLamp(970, 468);
-    } else {
+    } else if (levelData.theme !== "industrial") {
       drawLamp(310, 252);
       drawLamp(970, 252);
       drawLamp(310, 468);
@@ -304,6 +306,7 @@ export function createRenderer(deps) {
       ctx.setLineDash([]);
       ctx.restore();
     }
+    ctx.scale(.82, .82);
     ctx.fillStyle = "rgba(61,34,39,.16)";
     fillRoundedRect(ctx, 8, 18, 208, 128, 16, "rgba(61,34,39,.18)");
     fillRoundedRect(ctx, 0, 0, 205, 122, 14, "#f2c27f");
@@ -369,6 +372,12 @@ export function createRenderer(deps) {
     ctx.save();
     ctx.translate(h.x, h.y);
 
+    if (levelData.theme === "industrial") {
+      drawIndustrialBuilding(h, index);
+      ctx.restore();
+      return;
+    }
+
     ctx.fillStyle = "rgba(58,35,42,.18)";
     fillRoundedRect(ctx, 7, 11, h.w, h.h + 8, 12, "rgba(58,35,42,.16)");
 
@@ -416,6 +425,40 @@ export function createRenderer(deps) {
     ctx.restore();
   }
 
+  function drawIndustrialBuilding(h, index) {
+    fillRoundedRect(ctx, 8, 8, h.w, h.h + 5, 8, "rgba(45, 28, 35, .18)");
+    fillRoundedRect(ctx, 0, 0, h.w, h.h, 7, h.wall);
+
+    ctx.fillStyle = h.roof;
+    ctx.fillRect(-4, -12, h.w + 8, 18);
+    ctx.fillStyle = "rgba(255, 214, 135, .7)";
+    ctx.fillRect(0, 4, h.w, 4);
+
+    ctx.fillStyle = "#6e4b4a";
+    for (let x = 18; x < h.w - 20; x += 48) {
+      fillRoundedRect(ctx, x, 28, 32, 25, 3, "#6e4b4a");
+      ctx.fillStyle = index % 2 ? "#ffc879" : "#f1a76b";
+      ctx.fillRect(x + 4, 32, 24, 17);
+      ctx.fillStyle = "#6e4b4a";
+    }
+
+    ctx.fillStyle = "#413640";
+    ctx.fillRect(h.w - 43, -28, 13, 30);
+    ctx.fillStyle = "#8d5b50";
+    ctx.fillRect(h.w - 48, -34, 23, 7);
+
+    fillRoundedRect(ctx, h.w / 2 - 20, h.h - 50, 40, 50, 4, "#493b43");
+    ctx.fillStyle = "#f3bd67";
+    ctx.beginPath();
+    ctx.arc(h.w / 2 + 10, h.h - 25, 2.5, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = index % 2 ? "#ffc36f" : "#ff8660";
+    ctx.font = "900 12px Nunito";
+    ctx.textAlign = "center";
+    ctx.fillText(index % 2 ? "FABRICA" : "ALMACEN", h.w / 2, 20);
+  }
+
   function drawWindow(x, y, color) {
     fillRoundedRect(ctx, x, y, 34, 30, 5, "#5b4140");
     fillRoundedRect(ctx, x + 4, y + 4, 26, 22, 3, color);
@@ -431,6 +474,10 @@ export function createRenderer(deps) {
 
   function drawTrees() {
     for (const tree of world.trees) {
+      if (tree.kind === "streetlight") {
+        drawIndustrialStreetlight(tree);
+        continue;
+      }
       const sway = Math.sin(tree.phase) * 1.5;
       ctx.save();
       ctx.translate(tree.x + sway, tree.y);
@@ -439,6 +486,30 @@ export function createRenderer(deps) {
       drawTreeCanopy(tree);
       ctx.restore();
     }
+  }
+
+  function drawIndustrialStreetlight(light) {
+    ctx.save();
+    ctx.translate(light.x, light.y);
+    fillRoundedRect(ctx, -4, 4, 8, 42, 4, "#3d3943");
+    fillRoundedRect(ctx, -12, 43, 24, 7, 3, "#2f2b33");
+    ctx.strokeStyle = "#5d5259";
+    ctx.lineWidth = 5;
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    ctx.moveTo(0, 8);
+    ctx.lineTo(17, 8);
+    ctx.stroke();
+    fillRoundedRect(ctx, 13, 2, 18, 12, 5, "#4a4248");
+    ctx.fillStyle = "#ffe083";
+    ctx.beginPath();
+    ctx.arc(24, 8, 5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "rgba(255,224,131,.14)";
+    ctx.beginPath();
+    ctx.ellipse(24, 17, 18, 11, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
   }
 
   function drawTreeCanopy(tree) {
@@ -457,6 +528,7 @@ export function createRenderer(deps) {
   }
 
   function actorBehindTree(actor, tree) {
+    if (tree.kind === "streetlight") return false;
     if (!actor) return false;
     return Math.abs(actor.x - tree.x) < tree.r + actor.r + 8 &&
       actor.y < tree.y + 30 &&
@@ -511,6 +583,22 @@ export function createRenderer(deps) {
       ctx.fillText("P", 0, 1);
       ctx.restore();
     }
+  }
+
+  function drawHeart() {
+    const heart = world?.heart;
+    if (!heart || !heart.active || heart.collected) return;
+    const bob = Math.sin(animationClock * 4 + heart.phase) * 5;
+    ctx.save();
+    ctx.translate(heart.x, heart.y + bob);
+    ctx.shadowColor = "#ff6f91";
+    ctx.shadowBlur = 18;
+    ctx.fillStyle = "#ff5d82";
+    ctx.font = "900 38px sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText("♥", 0, 0);
+    ctx.restore();
   }
 
   function drawTarget() {
@@ -692,6 +780,7 @@ export function createRenderer(deps) {
 
   function drawCats() {
     for (const cat of world.cats) {
+      if (cat.stunned > 0) continue;
       const bounce = Math.abs(Math.sin(cat.phase)) * 2;
       ctx.save();
       ctx.translate(cat.x, cat.y - bounce);
@@ -722,6 +811,26 @@ export function createRenderer(deps) {
       ctx.beginPath();
       ctx.arc(-13, -2, 12, Math.PI * .6, Math.PI * 1.6);
       ctx.stroke();
+      ctx.restore();
+    }
+  }
+
+  function drawDogs() {
+    for (const dog of world?.dogs || []) {
+      if (dog.stunned > 0) continue;
+      const bounce = Math.abs(Math.sin(dog.phase)) * 2;
+      ctx.save();
+      ctx.translate(dog.x, dog.y - bounce);
+      if (dog.dir < 0) ctx.scale(-1, 1);
+      ctx.fillStyle = "rgba(48,28,33,.22)";
+      ctx.beginPath(); ctx.ellipse(0, 16, 21, 6, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = "#a9653e";
+      ctx.beginPath(); ctx.ellipse(0, 0, 18, 12, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(16, -7, 11, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = "#75432f";
+      ctx.beginPath(); ctx.moveTo(8, -14); ctx.lineTo(5, -28); ctx.lineTo(16, -18); ctx.moveTo(22, -15); ctx.lineTo(30, -25); ctx.lineTo(29, -10); ctx.fill();
+      ctx.fillStyle = "#fff0c6";
+      ctx.beginPath(); ctx.arc(20, -8, 2.5, 0, Math.PI * 2); ctx.fill();
       ctx.restore();
     }
   }

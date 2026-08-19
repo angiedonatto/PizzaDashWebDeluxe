@@ -40,7 +40,7 @@ LEVELS.push({
 (() => {
   "use strict";
 
-  const LEVEL_URLS = ["../level-1/", "../level-2/", "../level-3/"];
+  const LEVEL_URLS = ["../level-1/", "../level-2/", "../level-3/", "../level-4/"];
 
   const canvas = document.getElementById("gameCanvas");
   const ctx = canvas.getContext("2d");

@@ -56,12 +56,12 @@ export const MAX_PIZZAS = 2;
 
 export const PIZZERIA = {
   x: 12,
-  y: 527,
-  w: 205,
-  h: 122,
-  refillX: 114,
-  refillY: 585,
-  radius: 88
+  y: 598,
+  w: 168,
+  h: 100,
+  refillX: 96,
+  refillY: 652,
+  radius: 52
 };
 
 export const RIVAL_PIZZERIA = {

@@ -610,6 +610,82 @@ kbd {
     linear-gradient(#1c245a 0 45%, #24284e 45% 100%);
 }
 
+.level-card--four .level-scene {
+  background: linear-gradient(180deg, #f39a62 0%, #f6b36b 42%, #9b6857 43%, #75545a 100%);
+}
+
+.scene-industrial-sun {
+  position: absolute;
+  top: 16px;
+  right: 24px;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  background: #ffd27a;
+  box-shadow: 0 0 22px rgba(255, 191, 104, .7);
+}
+
+.scene-industrial-building {
+  position: absolute;
+  bottom: 40px;
+  width: 72px;
+  height: 54px;
+  border: 5px solid #764b45;
+  background: #bd7655;
+  box-shadow: inset 0 12px 0 #9b5649;
+}
+
+.scene-industrial-building::after {
+  content: "";
+  position: absolute;
+  inset: 20px 10px 8px;
+  background: repeating-linear-gradient(90deg, #ffd484 0 10px, transparent 10px 18px);
+}
+
+.scene-industrial-building--a { left: 20px; }
+.scene-industrial-building--b { right: 24px; height: 66px; }
+
+.scene-industrial-road {
+  position: absolute;
+  left: 0;
+  width: 100%;
+  height: 9px;
+  background: #4e4751;
+  border-top: 2px solid rgba(255, 221, 130, .8);
+  border-bottom: 2px solid rgba(255, 221, 130, .8);
+  transform: skewY(-8deg);
+}
+
+.scene-industrial-road::after {
+  content: "";
+  position: absolute;
+  left: 8%;
+  right: 8%;
+  top: 2px;
+  border-top: 2px dashed #f9cf69;
+}
+
+.scene-industrial-road--a { bottom: 20px; }
+.scene-industrial-road--b { bottom: 62px; }
+.scene-industrial-road--c {
+  top: 0;
+  left: 47%;
+  width: 9px;
+  height: 100%;
+  transform: none;
+  border: 0;
+}
+
+.scene-industrial-road--c::after {
+  top: 8%;
+  bottom: 8%;
+  left: 3px;
+  right: auto;
+  height: 84%;
+  border-top: 0;
+  border-left: 2px dashed #f9cf69;
+}
+
 .scene-road,
 .scene-night-road {
   position: absolute;

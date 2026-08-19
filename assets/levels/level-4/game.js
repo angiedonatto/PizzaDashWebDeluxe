@@ -402,7 +402,7 @@ import { createRenderer } from "./src/rendering.js?v=cat-pizza-2";
     const dogs = [];
 
     const treeSpots = theme === "industrial"
-      ? [[390, 110], [770, 110], [390, 405], [770, 405], [390, 650], [770, 650], [1120, 300]]
+      ? [[424, 122], [752, 118], [424, 402], [752, 402], [424, 650], [752, 650], [1188, 150]]
       : theme === "night"
       ? [
           [242, 182], [508, 182], [738, 180], [1190, 184],
@@ -420,14 +420,20 @@ import { createRenderer } from "./src/rendering.js?v=cat-pizza-2";
         ];
 
     treeSpots.forEach(([x, y], index) => {
-      const tree = { x, y, r: 26 + (index % 3) * 3, phase: rand(0, Math.PI * 2) };
+      const tree = {
+        x,
+        y,
+        r: theme === "industrial" ? 12 : 26 + (index % 3) * 3,
+        phase: rand(0, Math.PI * 2),
+        kind: theme === "industrial" ? "streetlight" : "tree"
+      };
       trees.push(tree);
       obstacles.push({
-        x: x - 9,
-        y: y + 15,
-        w: 18,
-        h: 28,
-        type: "tree"
+        x: x - (tree.kind === "streetlight" ? 6 : 9),
+        y: y + (tree.kind === "streetlight" ? 24 : 15),
+        w: tree.kind === "streetlight" ? 12 : 18,
+        h: tree.kind === "streetlight" ? 18 : 28,
+        type: tree.kind
       });
     });
 
@@ -1220,7 +1226,10 @@ import { createRenderer } from "./src/rendering.js?v=cat-pizza-2";
   }
 
   function findNearbyTreeEscape(actor) {
-    const tree = world.trees.find(item => Math.hypot(actor.x - item.x, actor.y - (item.y + 24)) < item.r + actor.r + 24);
+    const tree = world.trees.find(item =>
+      item.kind !== "streetlight" &&
+      Math.hypot(actor.x - item.x, actor.y - (item.y + 24)) < item.r + actor.r + 24
+    );
     if (!tree) return null;
     const candidates = [
       { x: tree.x - tree.r - 36, y: tree.y + 48 },

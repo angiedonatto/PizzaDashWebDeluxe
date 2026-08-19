@@ -235,14 +235,7 @@ export function createRenderer(deps) {
       drawLamp(970, 252);
       drawLamp(310, 468);
       drawLamp(970, 468);
-    } else if (levelData.theme === "industrial") {
-      drawLamp(416, 188);
-      drawLamp(842, 188);
-      drawLamp(416, 452);
-      drawLamp(842, 452);
-      drawLamp(416, 626);
-      drawLamp(842, 626);
-    } else {
+    } else if (levelData.theme !== "industrial") {
       drawLamp(310, 252);
       drawLamp(970, 252);
       drawLamp(310, 468);
@@ -449,10 +442,10 @@ export function createRenderer(deps) {
       ctx.fillStyle = "#6e4b4a";
     }
 
-    ctx.fillStyle = "#4b3d43";
-    ctx.fillRect(h.w - 48, -32, 18, 34);
+    ctx.fillStyle = "#413640";
+    ctx.fillRect(h.w - 43, -28, 13, 30);
     ctx.fillStyle = "#8d5b50";
-    ctx.fillRect(h.w - 53, -38, 28, 8);
+    ctx.fillRect(h.w - 48, -34, 23, 7);
 
     fillRoundedRect(ctx, h.w / 2 - 20, h.h - 50, 40, 50, 4, "#493b43");
     ctx.fillStyle = "#f3bd67";
@@ -481,6 +474,10 @@ export function createRenderer(deps) {
 
   function drawTrees() {
     for (const tree of world.trees) {
+      if (tree.kind === "streetlight") {
+        drawIndustrialStreetlight(tree);
+        continue;
+      }
       const sway = Math.sin(tree.phase) * 1.5;
       ctx.save();
       ctx.translate(tree.x + sway, tree.y);
@@ -489,6 +486,30 @@ export function createRenderer(deps) {
       drawTreeCanopy(tree);
       ctx.restore();
     }
+  }
+
+  function drawIndustrialStreetlight(light) {
+    ctx.save();
+    ctx.translate(light.x, light.y);
+    fillRoundedRect(ctx, -4, 4, 8, 42, 4, "#3d3943");
+    fillRoundedRect(ctx, -12, 43, 24, 7, 3, "#2f2b33");
+    ctx.strokeStyle = "#5d5259";
+    ctx.lineWidth = 5;
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    ctx.moveTo(0, 8);
+    ctx.lineTo(17, 8);
+    ctx.stroke();
+    fillRoundedRect(ctx, 13, 2, 18, 12, 5, "#4a4248");
+    ctx.fillStyle = "#ffe083";
+    ctx.beginPath();
+    ctx.arc(24, 8, 5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "rgba(255,224,131,.14)";
+    ctx.beginPath();
+    ctx.ellipse(24, 17, 18, 11, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
   }
 
   function drawTreeCanopy(tree) {
@@ -507,6 +528,7 @@ export function createRenderer(deps) {
   }
 
   function actorBehindTree(actor, tree) {
+    if (tree.kind === "streetlight") return false;
     if (!actor) return false;
     return Math.abs(actor.x - tree.x) < tree.r + actor.r + 8 &&
       actor.y < tree.y + 30 &&

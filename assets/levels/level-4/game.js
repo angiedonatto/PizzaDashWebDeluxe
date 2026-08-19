@@ -71,6 +71,11 @@ import { createRenderer } from "./src/rendering.js?v=cat-pizza-2";
   let mobileSprintActive = false;
   let lastMobileDirectionTapAt = 0;
   let lastMobileDirectionCode = "";
+  const CAMPAIGN_SCORE_KEY = "pizzaDashCampaignScore";
+  const LEVEL_PROGRESS_KEY = "pizzaDashLevelProgress";
+  const getUpgrades = () => JSON.parse(localStorage.getItem("pizzaDashUpgrades") || '{"speed":0,"capacity":0,"health":0}');
+  const maxPizzas = () => MAX_PIZZAS + getUpgrades().capacity;
+  const maxHearts = () => 3 + getUpgrades().health;
   const particles = [];
   const floatTexts = [];
   const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
@@ -87,7 +92,7 @@ import { createRenderer } from "./src/rendering.js?v=cat-pizza-2";
     getState: () => ({
       state, world, levelData, delivered, currentTarget, player, rival,
       animationClock, rainOffset, particles, floatTexts, invulnerable,
-      pizzasCarried, levelIntroTimer, timeLeft, score, hearts, screenShake,
+      pizzasCarried, maxPizzas: maxPizzas(), levelIntroTimer, timeLeft, score, hearts, screenShake,
       activeLevel
     })
   });
@@ -107,6 +112,51 @@ import { createRenderer } from "./src/rendering.js?v=cat-pizza-2";
     roundedRectPath(context, x, y, w, h, r);
     context.fillStyle = color;
     context.fill();
+  }
+
+  function readLevelProgress() {
+    try {
+      return JSON.parse(localStorage.getItem(LEVEL_PROGRESS_KEY) || "{}");
+    } catch {
+      return {};
+    }
+  }
+
+  function loadCampaignScore() {
+    return Number(localStorage.getItem(CAMPAIGN_SCORE_KEY) || 0);
+  }
+
+  function saveCampaignScore() {
+    localStorage.setItem(CAMPAIGN_SCORE_KEY, String(Math.max(0, Math.floor(score))));
+  }
+
+  function restoreLevelProgress(index) {
+    const saved = readLevelProgress()[index];
+    if (!saved) return;
+    delivered = clamp(Number(saved.delivered ?? delivered), 0, levelData.required);
+    pizzasCarried = clamp(Number(saved.pizzasCarried ?? pizzasCarried), 0, maxPizzas());
+    hearts = clamp(Number(saved.hearts ?? hearts), 1, maxHearts());
+    currentTarget = clamp(Number(saved.currentTarget ?? currentTarget), 0, Math.max(0, world.houses.length - 1));
+    timeLeft = clamp(Number(saved.timeLeft ?? timeLeft), 1, levelData.duration);
+  }
+
+  function saveLevelProgress() {
+    const store = readLevelProgress();
+    store[activeLevel] = {
+      delivered,
+      pizzasCarried,
+      hearts,
+      currentTarget,
+      timeLeft: Math.max(0, timeLeft),
+      completed: levelObjectiveComplete()
+    };
+    localStorage.setItem(LEVEL_PROGRESS_KEY, JSON.stringify(store));
+  }
+
+  function travelTo(url) {
+    saveLevelProgress();
+    saveCampaignScore();
+    window.location.href = url;
   }
 
   function updateResponsiveCamera(dt) {
@@ -313,10 +363,10 @@ import { createRenderer } from "./src/rendering.js?v=cat-pizza-2";
   }
 
   function refreshLevelStars() {
-    LEVELS.forEach((_, index) => {
+    LEVEL_URLS.forEach((_, index) => {
       const value = Number(localStorage.getItem(`pizzaDashStars${index}`) || 0);
       const node = document.getElementById(`stars-${index}`);
-      node.textContent = `${"★ ".repeat(value)}${"☆ ".repeat(3 - value)}`.trim();
+      if (node) node.textContent = `${"★ ".repeat(value)}${"☆ ".repeat(3 - value)}`.trim();
     });
   }
 
@@ -982,7 +1032,7 @@ import { createRenderer } from "./src/rendering.js?v=cat-pizza-2";
       x: levelData.start.x,
       y: levelData.start.y,
       r: 20,
-      speed: 215,
+      speed: 215 + getUpgrades().speed * 25,
       facing: "right",
       moving: false,
       bump: 0,
@@ -999,14 +1049,15 @@ import { createRenderer } from "./src/rendering.js?v=cat-pizza-2";
     timeLeft = levelData.duration;
     levelElapsed = 0;
     delivered = 0;
-    score = 0;
-    hearts = 3;
-    pizzasCarried = MAX_PIZZAS;
+    score = loadCampaignScore();
+    hearts = maxHearts();
+    pizzasCarried = maxPizzas();
     currentTarget = 0;
     invulnerable = 0;
     actionCooldown = 0;
     deliveryCombo = 0;
     lastDeliveryAt = 0;
+    restoreLevelProgress(index);
     particles.length = 0;
     floatTexts.length = 0;
     state = "playing";
@@ -1395,7 +1446,7 @@ import { createRenderer } from "./src/rendering.js?v=cat-pizza-2";
       return;
     }
 
-    timeLeft -= dt;
+    if (!levelObjectiveComplete()) timeLeft -= dt;
     levelElapsed += dt;
     levelIntroTimer = Math.max(0, levelIntroTimer - dt);
     invulnerable = Math.max(0, invulnerable - dt);
@@ -1436,6 +1487,7 @@ import { createRenderer } from "./src/rendering.js?v=cat-pizza-2";
       movePlayer(xAxis * speed * dt, yAxis * speed * dt);
       if (inPuddle && Math.abs(xAxis) + Math.abs(yAxis) > 0) triggerPlayerSlip(xAxis, yAxis);
     }
+    if (tryExitLevel()) return;
     if (player.moving && sprinting) {
       player.trailTimer -= dt;
       if (player.trailTimer <= 0) {
@@ -1465,7 +1517,7 @@ import { createRenderer } from "./src/rendering.js?v=cat-pizza-2";
     updateParticles(dt);
     updateFloatTexts(dt);
 
-    if (timeLeft <= 0 || hearts <= 0) {
+    if ((timeLeft <= 0 && !levelObjectiveComplete()) || hearts <= 0) {
       finishLevel(false);
     }
 
@@ -1646,6 +1698,7 @@ import { createRenderer } from "./src/rendering.js?v=cat-pizza-2";
       if (!coin.taken && Math.hypot(player.x - coin.x, player.y - coin.y) < player.r + 15) {
         coin.taken = true;
         score += 50;
+        saveCampaignScore();
         burst(coin.x, coin.y, "#ffd15b", 12);
         spawnText(coin.x, coin.y - 28, "+50", "#f2a82f");
         sound("coin");
@@ -1662,21 +1715,21 @@ import { createRenderer } from "./src/rendering.js?v=cat-pizza-2";
     }
     if (Math.hypot(player.x - heart.x, player.y - heart.y) < player.r + 18) {
       heart.collected = true;
-      hearts = Math.min(3, hearts + 1);
+      hearts = Math.min(maxHearts(), hearts + 1);
       burst(heart.x, heart.y, "#ff6f91", 18);
-      spawnText(heart.x, heart.y - 30, hearts === 3 ? "¡Vida al máximo!" : "+1 vida", "#ff7895");
+      spawnText(heart.x, heart.y - 30, hearts === maxHearts() ? "¡Vida al máximo!" : "+1 vida", "#ff7895");
       sound("coin");
     }
   }
 
   function updatePizzeriaRefill() {
-    if (pizzasCarried >= MAX_PIZZAS) return;
+    if (pizzasCarried >= maxPizzas()) return;
     const nearPizzeria = Math.hypot(player.x - PIZZERIA.refillX, player.y - PIZZERIA.refillY) < PIZZERIA.radius;
     if (!nearPizzeria) return;
-    pizzasCarried = MAX_PIZZAS;
+    pizzasCarried = maxPizzas();
     burst(PIZZERIA.refillX, PIZZERIA.refillY, "#ffd25d", 18);
-    spawnText(PIZZERIA.refillX, PIZZERIA.refillY - 38, "RECARGA x2", "#f2a82f");
-    showToast("Mochila recargada: 2 pizzas");
+    spawnText(PIZZERIA.refillX, PIZZERIA.refillY - 38, `RECARGA x${maxPizzas()}`, "#f2a82f");
+    showToast(`Mochila recargada: ${maxPizzas()} pizzas`);
     sound("coin");
     updateHud();
   }
@@ -1824,6 +1877,7 @@ import { createRenderer } from "./src/rendering.js?v=cat-pizza-2";
     pizzasCarried -= 1;
     const comboBonus = deliveryCombo > 1 ? deliveryCombo * 35 : 0;
     score += 200 + comboBonus + Math.ceil(timeLeft * 2);
+    saveCampaignScore();
     player.celebrate = 1;
     burst(target.x, target.y, "#ffd25d", 28);
     burst(target.x, target.y, "#65b86f", 16);
@@ -1832,7 +1886,8 @@ import { createRenderer } from "./src/rendering.js?v=cat-pizza-2";
     sound("deliver");
 
     if (delivered >= levelData.required) {
-      setTimeout(() => finishLevel(true), 520);
+      showToast("Objetivo listo. Sal por la derecha");
+      updateHud();
       return;
     }
 
@@ -1849,6 +1904,49 @@ import { createRenderer } from "./src/rendering.js?v=cat-pizza-2";
     return next;
   }
 
+  function levelObjectiveComplete() {
+    return delivered >= levelData.required;
+  }
+
+  function tryExitLevel() {
+    const entryRoad = world.roads.some(road =>
+      road.axis === "x" &&
+      player.x <= player.r + 10 &&
+      player.y > road.y + 18 &&
+      player.y < road.y + road.h - 18
+    );
+    if (entryRoad) {
+      const previousUrl = LEVEL_URLS[activeLevel - 1];
+      if (previousUrl) {
+        state = "transitioning";
+        showToast(`Volviendo al nivel ${activeLevel}`);
+        setTimeout(() => { travelTo(previousUrl); }, 650);
+        return true;
+      }
+    }
+
+    if (!levelObjectiveComplete()) return false;
+    const exitRoad = world.roads.some(road =>
+      road.axis === "x" &&
+      player.x >= W - player.r - 10 &&
+      player.y > road.y + 18 &&
+      player.y < road.y + road.h - 18
+    );
+    if (!exitRoad) return false;
+
+    const nextUrl = LEVEL_URLS[activeLevel + 1];
+    if (nextUrl) {
+      state = "transitioning";
+      showToast(`Nivel ${activeLevel + 2}: en camino`);
+      setTimeout(() => { travelTo(nextUrl); }, 650);
+    } else {
+      saveLevelProgress();
+      saveCampaignScore();
+      finishLevel(true);
+    }
+    return true;
+  }
+
   function finishLevel(won) {
     if (state !== "playing") return;
     stopBackgroundMusic();
@@ -1859,10 +1957,12 @@ import { createRenderer } from "./src/rendering.js?v=cat-pizza-2";
 
     const used = levelData.duration - Math.max(0, timeLeft);
     const stars = won
-      ? (hearts === 3 && timeLeft > levelData.duration * .35 ? 3 : hearts >= 2 ? 2 : 1)
+      ? (hearts === maxHearts() && timeLeft > levelData.duration * .35 ? 3 : hearts >= 2 ? 2 : 1)
       : 0;
 
     if (won) {
+      saveLevelProgress();
+      saveCampaignScore();
       const previous = Number(localStorage.getItem(`pizzaDashStars${activeLevel}`) || 0);
       localStorage.setItem(`pizzaDashStars${activeLevel}`, String(Math.max(previous, stars)));
       el.resultIcon.textContent = "🏆";
@@ -1881,7 +1981,7 @@ import { createRenderer } from "./src/rendering.js?v=cat-pizza-2";
         autoAdvanceTimer = setTimeout(() => {
           const nextUrl = LEVEL_URLS[activeLevel + 1];
           if (nextUrl) {
-            window.location.href = nextUrl;
+            travelTo(nextUrl);
             return;
           }
           beginLevel(activeLevel + 1);
@@ -1908,11 +2008,11 @@ import { createRenderer } from "./src/rendering.js?v=cat-pizza-2";
   function updateHud() {
     el.hudLevel.textContent = String(activeLevel + 1);
     el.hudTime.textContent = formatTime(timeLeft);
-    el.hudDeliveries.textContent = `${pizzasCarried}/${MAX_PIZZAS} · ${delivered}/${levelData.required}`;
+    el.hudDeliveries.textContent = `${pizzasCarried}/${maxPizzas()} · ${delivered}/${levelData.required}`;
     el.hudScore.textContent = String(score);
-    el.hudHearts.textContent = `${"♥ ".repeat(hearts)}${"♡ ".repeat(3 - hearts)}`.trim();
+    el.hudHearts.textContent = `${"♥ ".repeat(hearts)}${"♡ ".repeat(Math.max(0, maxHearts() - hearts))}`.trim();
     el.missionText.textContent = delivered >= levelData.required
-      ? "¡Todas las pizzas fueron entregadas!"
+      ? "Objetivo listo: sal por la orilla derecha"
       : pizzasCarried <= 0
         ? "Vuelve a la pizzería para recargar"
       : rival

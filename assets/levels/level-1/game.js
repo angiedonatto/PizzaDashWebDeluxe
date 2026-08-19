@@ -112,14 +112,21 @@ LEVELS.push({
   let levelIntroTimer = 0;
   let rival = null;
   let stormTimer = 0;
+  let mobileSprintActive = false;
+  let lastMobileDirectionTapAt = 0;
+  let lastMobileDirectionCode = "";
+  let mobileCameraX = 0;
+  let mobileCameraY = 0;
   const particles = [];
   const floatTexts = [];
   const MAX_PIZZAS = 2;
   const SHOP_COSTS = { speed: 300, capacity: 400, health: 500 };
+  const CAMPAIGN_SCORE_KEY = "pizzaDashCampaignScore";
+  const LEVEL_PROGRESS_KEY = "pizzaDashLevelProgress";
+  const travelParams = new URLSearchParams(window.location.search);
+  const shopReturnUrl = travelParams.get("return");
+  const mobileCameraQuery = window.matchMedia("(max-width: 650px), (hover: none) and (pointer: coarse), (orientation: landscape) and (max-height: 760px)");
   const getUpgrades = () => JSON.parse(localStorage.getItem("pizzaDashUpgrades") || '{"speed":0,"capacity":0,"health":0}');
-  const resetUpgrades = () => localStorage.removeItem("pizzaDashUpgrades");
-  // A fresh page load starts a new run instead of restoring the previous run's shop state.
-  resetUpgrades();
   const maxPizzas = () => MAX_PIZZAS + getUpgrades().capacity;
   const maxHearts = () => 3 + getUpgrades().health;
   const PIZZERIA = { x: 12, y: 527, w: 205, h: 122, refillX: 114, refillY: 585, radius: 88 };
@@ -144,6 +151,92 @@ LEVELS.push({
     roundedRectPath(context, x, y, w, h, r);
     context.fillStyle = color;
     context.fill();
+  }
+
+  function updateResponsiveCamera(dt) {
+    if (!mobileCameraQuery.matches) {
+      canvas.style.width = "";
+      canvas.style.height = "";
+      canvas.style.transform = "";
+      canvas.style.objectPosition = "";
+      return;
+    }
+
+    const viewport = canvas.parentElement?.getBoundingClientRect();
+    if (!viewport?.width || !viewport?.height) return;
+
+    const landscapeView = viewport.width > viewport.height;
+    const zoom = landscapeView ? 1 : .84;
+    const scale = Math.max(viewport.width / W, viewport.height / H) * zoom;
+    const renderedW = W * scale;
+    const renderedH = H * scale;
+    const centerX = (viewport.width - renderedW) * .5;
+    const centerY = (viewport.height - renderedH) * .5;
+    const minX = viewport.width - renderedW;
+    const minY = viewport.height - renderedH;
+    const desiredX = viewport.width * .5;
+    const desiredY = viewport.height * (landscapeView ? .58 : .5);
+    const targetX = renderedW <= viewport.width
+      ? centerX
+      : player
+      ? clamp(desiredX - player.x * scale, minX, 0)
+      : centerX;
+    const targetY = renderedH <= viewport.height
+      ? centerY
+      : player
+      ? clamp(desiredY - player.y * scale, minY, 0)
+      : centerY;
+    const follow = clamp(dt * (landscapeView ? 8 : 5.5), 0, 1);
+    mobileCameraX = lerp(mobileCameraX, targetX, follow);
+    mobileCameraY = lerp(mobileCameraY, targetY, follow);
+    canvas.style.width = `${renderedW.toFixed(2)}px`;
+    canvas.style.height = `${renderedH.toFixed(2)}px`;
+    canvas.style.transform = `translate3d(${mobileCameraX.toFixed(2)}px, ${mobileCameraY.toFixed(2)}px, 0)`;
+  }
+
+  function readLevelProgress() {
+    try {
+      return JSON.parse(localStorage.getItem(LEVEL_PROGRESS_KEY) || "{}");
+    } catch {
+      return {};
+    }
+  }
+
+  function loadCampaignScore() {
+    return Number(localStorage.getItem(CAMPAIGN_SCORE_KEY) || 0);
+  }
+
+  function saveCampaignScore() {
+    localStorage.setItem(CAMPAIGN_SCORE_KEY, String(Math.max(0, Math.floor(score))));
+  }
+
+  function restoreLevelProgress(index) {
+    const saved = readLevelProgress()[index];
+    if (!saved) return;
+    delivered = clamp(Number(saved.delivered ?? delivered), 0, levelData.required);
+    pizzasCarried = clamp(Number(saved.pizzasCarried ?? pizzasCarried), 0, maxPizzas());
+    hearts = clamp(Number(saved.hearts ?? hearts), 1, maxHearts());
+    currentTarget = clamp(Number(saved.currentTarget ?? currentTarget), 0, Math.max(0, world.houses.length - 1));
+    timeLeft = clamp(Number(saved.timeLeft ?? timeLeft), 1, levelData.duration);
+  }
+
+  function saveLevelProgress() {
+    const store = readLevelProgress();
+    store[activeLevel] = {
+      delivered,
+      pizzasCarried,
+      hearts,
+      currentTarget,
+      timeLeft: Math.max(0, timeLeft),
+      completed: levelObjectiveComplete()
+    };
+    localStorage.setItem(LEVEL_PROGRESS_KEY, JSON.stringify(store));
+  }
+
+  function travelTo(url) {
+    saveLevelProgress();
+    saveCampaignScore();
+    window.location.href = url;
   }
 
   function rectsOverlap(a, b) {
@@ -235,6 +328,27 @@ LEVELS.push({
     }
   }
 
+  function updateSoundButtonState() {
+    el.soundBtn.classList.toggle("is-muted", !audioEnabled);
+    el.soundBtn.setAttribute("aria-label", audioEnabled ? "Desactivar sonido" : "Activar sonido");
+  }
+
+  function setMobileSprintActive(active) {
+    mobileSprintActive = active;
+    if (active) {
+      keys.add("ShiftLeft");
+    } else {
+      keys.delete("ShiftLeft");
+    }
+    document.querySelector(".dpad")?.classList.toggle("is-sprinting", active);
+  }
+
+  function clearMobileSprint() {
+    setMobileSprintActive(false);
+    lastMobileDirectionTapAt = 0;
+    lastMobileDirectionCode = "";
+  }
+
   function showOnly(screen) {
     [el.menu, el.level, el.how, el.pause, el.result, el.shop].forEach(node => node.classList.add("hidden"));
     if (screen) screen.classList.remove("hidden");
@@ -265,10 +379,10 @@ LEVELS.push({
   }
 
   function refreshLevelStars() {
-    LEVELS.forEach((_, index) => {
+    LEVEL_URLS.forEach((_, index) => {
       const value = Number(localStorage.getItem(`pizzaDashStars${index}`) || 0);
       const node = document.getElementById(`stars-${index}`);
-      node.textContent = `${"★ ".repeat(value)}${"☆ ".repeat(3 - value)}`.trim();
+      if (node) node.textContent = `${"★ ".repeat(value)}${"☆ ".repeat(3 - value)}`.trim();
     });
   }
 
@@ -502,7 +616,7 @@ LEVELS.push({
     stormTimer = levelData.mode === "stormRace" ? 3.8 : 0;
     timeLeft = levelData.duration;
     delivered = 0;
-    score = 0;
+    score = loadCampaignScore();
     hearts = maxHearts();
     pizzasCarried = maxPizzas();
     currentTarget = 0;
@@ -510,6 +624,7 @@ LEVELS.push({
     actionCooldown = 0;
     deliveryCombo = 0;
     lastDeliveryAt = 0;
+    restoreLevelProgress(index);
     particles.length = 0;
     floatTexts.length = 0;
     state = "playing";
@@ -645,7 +760,7 @@ LEVELS.push({
       return;
     }
 
-    timeLeft -= dt;
+    if (!levelObjectiveComplete()) timeLeft -= dt;
     levelIntroTimer = Math.max(0, levelIntroTimer - dt);
     invulnerable = Math.max(0, invulnerable - dt);
     actionCooldown = Math.max(0, actionCooldown - dt);
@@ -678,15 +793,8 @@ LEVELS.push({
     if (yAxis > 0 && Math.abs(yAxis) > Math.abs(xAxis)) player.facing = "down";
 
     movePlayer(xAxis * speed * dt, yAxis * speed * dt);
-    const exitRoad = delivered >= levelData.required && world.roads.some(road => road.axis === "x" && player.x >= W - player.r - 10 && player.y > road.y + 18 && player.y < road.y + road.h - 18);
-    if (exitRoad) {
-      if (activeLevel < LEVELS.length - 1) {
-        state = "transitioning";
-        setTimeout(() => { window.location.href = "../level-2/"; }, 650);
-      }
-      else finishLevel(true);
-      return;
-    }
+    if (tryTravelEdge()) return;
+
     if (player.moving && sprinting) {
       player.trailTimer -= dt;
       if (player.trailTimer <= 0) {
@@ -714,7 +822,7 @@ LEVELS.push({
     updateParticles(dt);
     updateFloatTexts(dt);
 
-    if (timeLeft <= 0 || hearts <= 0) {
+    if ((timeLeft <= 0 && !levelObjectiveComplete()) || hearts <= 0) {
       finishLevel(false);
     }
 
@@ -793,6 +901,7 @@ LEVELS.push({
       if (!coin.taken && Math.hypot(player.x - coin.x, player.y - coin.y) < player.r + 15) {
         coin.taken = true;
         score += 50;
+        saveCampaignScore();
         burst(coin.x, coin.y, "#ffd15b", 12);
         spawnText(coin.x, coin.y - 28, "+50", "#f2a82f");
         sound("coin");
@@ -808,6 +917,7 @@ LEVELS.push({
     const pizzaCost = (levelData.pizzaCost || 50) * pizzasToBuy;
     if (score < pizzaCost) { showToast(`Necesitas ${pizzaCost} monedas`); return; }
     score -= pizzaCost;
+    saveCampaignScore();
     pizzasCarried = maxPizzas();
     burst(PIZZERIA.refillX, PIZZERIA.refillY, "#ffd25d", 18);
     spawnText(PIZZERIA.refillX, PIZZERIA.refillY - 38, `-${pizzaCost} 🪙`, "#f2a82f");
@@ -916,6 +1026,7 @@ LEVELS.push({
     pizzasCarried -= 1;
     const comboBonus = deliveryCombo > 1 ? deliveryCombo * 35 : 0;
     score += 200 + comboBonus + Math.ceil(timeLeft * 2);
+    saveCampaignScore();
     player.celebrate = 1;
     burst(target.x, target.y, "#ffd25d", 28);
     burst(target.x, target.y, "#65b86f", 16);
@@ -936,6 +1047,44 @@ LEVELS.push({
     return next;
   }
 
+  function levelObjectiveComplete() {
+    return delivered >= levelData.required;
+  }
+
+  function isOnHorizontalRoadEdge(side) {
+    return world.roads.some(road =>
+      road.axis === "x" &&
+      (side === "left" ? player.x <= player.r + 10 : player.x >= W - player.r - 10) &&
+      player.y > road.y + 18 &&
+      player.y < road.y + road.h - 18
+    );
+  }
+
+  function tryTravelEdge() {
+    if (activeLevel > 0 && isOnHorizontalRoadEdge("left")) {
+      const previousUrl = LEVEL_URLS[activeLevel - 1];
+      if (previousUrl) {
+        state = "transitioning";
+        showToast(`Volviendo al nivel ${activeLevel}`);
+        setTimeout(() => { travelTo(previousUrl); }, 650);
+        return true;
+      }
+    }
+
+    if (!levelObjectiveComplete() || !isOnHorizontalRoadEdge("right")) return false;
+    const nextUrl = LEVEL_URLS[activeLevel + 1];
+    if (nextUrl) {
+      state = "transitioning";
+      showToast(`Nivel ${activeLevel + 2}: en camino`);
+      setTimeout(() => { travelTo(nextUrl); }, 650);
+    } else {
+      saveLevelProgress();
+      saveCampaignScore();
+      finishLevel(true);
+    }
+    return true;
+  }
+
   function finishLevel(won) {
     if (state !== "playing") return;
     state = won ? "won" : "lost";
@@ -945,10 +1094,12 @@ LEVELS.push({
 
     const used = levelData.duration - Math.max(0, timeLeft);
     const stars = won
-      ? (hearts === 3 && timeLeft > levelData.duration * .35 ? 3 : hearts >= 2 ? 2 : 1)
+      ? (hearts === maxHearts() && timeLeft > levelData.duration * .35 ? 3 : hearts >= 2 ? 2 : 1)
       : 0;
 
     if (won) {
+      saveLevelProgress();
+      saveCampaignScore();
       const previous = Number(localStorage.getItem(`pizzaDashStars${activeLevel}`) || 0);
       localStorage.setItem(`pizzaDashStars${activeLevel}`, String(Math.max(previous, stars)));
       el.resultIcon.textContent = "🏆";
@@ -967,7 +1118,7 @@ LEVELS.push({
         autoAdvanceTimer = setTimeout(() => {
           const nextUrl = LEVEL_URLS[activeLevel + 1];
           if (nextUrl) {
-            window.location.href = nextUrl;
+            travelTo(nextUrl);
             return;
           }
           beginLevel(activeLevel + 1);
@@ -1308,7 +1459,7 @@ LEVELS.push({
     const y = PIZZERIA.y;
     ctx.save();
     ctx.translate(x, y);
-    if (state === "playing" && pizzasCarried < MAX_PIZZAS) {
+    if (state === "playing" && pizzasCarried < maxPizzas()) {
       ctx.save();
       ctx.translate(PIZZERIA.refillX - x, PIZZERIA.refillY - y);
       const pulse = 1 + Math.sin(animationClock * 6) * .08;
@@ -1952,6 +2103,7 @@ LEVELS.push({
     const dt = Math.min((now - previousTime) / 1000, .035);
     previousTime = now;
     update(dt);
+    updateResponsiveCamera(dt);
     draw();
     requestAnimationFrame(loop);
   }
@@ -1975,13 +2127,24 @@ LEVELS.push({
     });
   }
   function openShop() { state = "shop"; showOnly(el.shop); refreshShop(); }
-  function closeShop() { state = "playing"; showOnly(null); updateHud(); }
+  function closeShop() {
+    saveCampaignScore();
+    if (shopReturnUrl) {
+      state = "transitioning";
+      travelTo(shopReturnUrl);
+      return;
+    }
+    state = "playing";
+    showOnly(null);
+    updateHud();
+  }
   function buyUpgrade(type) {
     const upgrades = getUpgrades();
     const price = SHOP_COSTS[type] * (upgrades[type] + 1);
     if (score < price) return;
     score -= price; upgrades[type] += 1;
     localStorage.setItem("pizzaDashUpgrades", JSON.stringify(upgrades));
+    saveCampaignScore();
     if (type === "speed" && player) player.speed += 25;
     if (type === "health") hearts += 1;
     updateHud(); refreshShop();
@@ -1995,7 +2158,7 @@ LEVELS.push({
   bindButton("resumeBtn", togglePause);
   bindButton("pauseMenuBtn", openMenu);
   bindButton("resultMenuBtn", openMenu);
-  bindButton("retryBtn", () => { resetUpgrades(); beginLevel(activeLevel); });
+  bindButton("retryBtn", () => beginLevel(activeLevel));
   bindButton("nextBtn", () => beginLevel(Math.min(activeLevel + 1, LEVELS.length - 1)));
   bindButton("closeShopBtn", closeShop);
   ["speed", "capacity", "health"].forEach(type => el[`${type}UpgradeBtn`].addEventListener("click", () => buyUpgrade(type)));
@@ -2007,9 +2170,15 @@ LEVELS.push({
 
   el.soundBtn.addEventListener("click", () => {
     audioEnabled = !audioEnabled;
-    el.soundBtn.textContent = audioEnabled ? "🔊" : "🔇";
+    updateSoundButtonState();
     if (audioEnabled) { sound("click"); startMusic(); }
     else stopMusic();
+  });
+
+  document.querySelectorAll(".mobile-controls, .mobile-controls button, .topbar-actions button, .control-icon").forEach(node => {
+    ["contextmenu", "selectstart", "dragstart"].forEach(type => {
+      node.addEventListener(type, event => event.preventDefault());
+    });
   });
 
   document.querySelectorAll(".level-card").forEach(card => {
@@ -2048,6 +2217,7 @@ LEVELS.push({
   window.addEventListener("keyup", event => keys.delete(event.code));
   window.addEventListener("blur", () => {
     keys.clear();
+    clearMobileSprint();
     if (state === "playing") togglePause();
   });
 
@@ -2055,6 +2225,21 @@ LEVELS.push({
     const code = button.dataset.key;
     const press = event => {
       event.preventDefault();
+      const now = performance.now();
+      const doubleTapped = !mobileSprintActive &&
+        code === lastMobileDirectionCode &&
+        now - lastMobileDirectionTapAt < 330;
+
+      if (doubleTapped) {
+        setMobileSprintActive(true);
+        lastMobileDirectionTapAt = 0;
+        lastMobileDirectionCode = "";
+      } else {
+        if (mobileSprintActive) setMobileSprintActive(false);
+        lastMobileDirectionTapAt = now;
+        lastMobileDirectionCode = code;
+      }
+
       keys.add(code);
       getAudioContext();
     };
@@ -2070,12 +2255,22 @@ LEVELS.push({
 
   document.getElementById("mobileAction").addEventListener("pointerdown", event => {
     event.preventDefault();
+    const shop = world?.shop;
+    if (state === "playing" && shop && Math.hypot(player.x - shop.doorX, player.y - shop.doorY) < 86) {
+      openShop();
+      return;
+    }
     attemptDelivery();
   });
 
   levelData = LEVELS[0];
   world = createDecorativeWorld();
   refreshLevelStars();
+  updateSoundButtonState();
   beginLevel(0);
+  if (travelParams.get("shop") === "1") {
+    openShop();
+    showToast("Tienda abierta");
+  }
   requestAnimationFrame(loop);
 })();

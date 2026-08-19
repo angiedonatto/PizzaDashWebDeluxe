@@ -17,6 +17,7 @@ export function createRenderer(deps) {
   let floatTexts;
   let invulnerable;
   let pizzasCarried;
+  let maxPizzas;
   let levelIntroTimer;
   let timeLeft;
   let score;
@@ -28,7 +29,7 @@ export function createRenderer(deps) {
     ({
       state, world, levelData, delivered, currentTarget, player, rival,
       animationClock, rainOffset, particles, floatTexts, invulnerable,
-      pizzasCarried, levelIntroTimer, timeLeft, score, hearts, screenShake,
+      pizzasCarried, maxPizzas, levelIntroTimer, timeLeft, score, hearts, screenShake,
       activeLevel
     } = deps.getState());
   }
@@ -286,7 +287,7 @@ export function createRenderer(deps) {
     const y = PIZZERIA.y;
     ctx.save();
     ctx.translate(x, y);
-    if (state === "playing" && pizzasCarried < MAX_PIZZAS) {
+    if (state === "playing" && pizzasCarried < maxPizzas) {
       ctx.save();
       ctx.translate(PIZZERIA.refillX - x, PIZZERIA.refillY - y);
       const pulse = 1 + Math.sin(animationClock * 6) * .08;

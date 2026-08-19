@@ -1,13 +1,236 @@
 :root {
   --level-accent: #ef5a43;
 }
- .shop-panel { width:min(920px,100%); text-align:center; color:#fff; background:linear-gradient(145deg,#61372d,#2b1b2d); border:4px solid #e4a44f; }
-.shop-panel h2 { margin:4px 0 8px; color:#ffd85f; }
-.shop-panel p { color:rgba(255,255,255,.75); }
-.shop-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:16px; margin:22px 0; }
-.shop-card { min-height:180px; border:3px solid rgba(255,216,95,.35); border-radius:18px; color:#fff; background:rgba(255,255,255,.1); cursor:pointer; display:grid; place-items:center; gap:5px; font:inherit; }
-.shop-card.is-selected,.shop-card:hover { border-color:#ffd85f; background:rgba(255,190,63,.2); transform:translateY(-3px); }
-.shop-card:disabled { opacity:.48; }
-.shop-card span { font-size:48px; }
-.shop-card b { color:#ffd85f; }
-@media (max-width:700px) { .shop-grid { grid-template-columns:1fr; } .shop-card { min-height:100px; } }
+
+.canvas-wrap,
+#gameCanvas {
+  background: #17192d;
+}
+
+.topbar-actions .icon-button {
+  position: relative;
+  overflow: hidden;
+  color: transparent;
+  font-size: 0;
+  -webkit-touch-callout: none;
+  user-select: none;
+}
+
+.control-icon {
+  width: 62%;
+  height: 62%;
+  display: block;
+  color: #fff;
+  fill: currentColor;
+  stroke: currentColor;
+  stroke-width: 2.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+
+.control-icon path,
+.control-icon rect {
+  pointer-events: none;
+}
+
+.sound-speaker,
+.control-icon rect,
+.dpad .control-icon path {
+  stroke: none;
+}
+
+.sound-wave,
+.sound-muted,
+.control-icon--box path + path {
+  fill: none;
+}
+
+.sound-muted {
+  display: none;
+  stroke-width: 2.8;
+}
+
+#soundBtn.is-muted .sound-wave {
+  display: none;
+}
+
+#soundBtn.is-muted .sound-muted {
+  display: block;
+}
+
+@media (max-width: 650px), (hover: none) and (pointer: coarse), (orientation: landscape) and (max-height: 760px) {
+  .canvas-wrap,
+  #gameCanvas {
+    background: #17192d;
+  }
+
+  .canvas-wrap {
+    display: block;
+  }
+
+  #gameCanvas {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: auto;
+    height: auto;
+    max-width: none;
+    max-height: none;
+    object-fit: fill;
+    will-change: transform;
+  }
+
+  .hud {
+    inset: max(46px, env(safe-area-inset-top)) 8px auto;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 6px;
+  }
+
+  .hud-group {
+    flex-wrap: nowrap;
+  }
+
+  .hud-center {
+    grid-column: 1 / -1;
+    min-width: 0;
+    order: 3;
+  }
+
+  .mission-card {
+    padding: 7px 10px 8px;
+    border-radius: 14px;
+  }
+
+  .mission-card > span {
+    margin-bottom: 5px;
+    font-size: 11px;
+    line-height: 1.15;
+  }
+
+  .toast {
+    bottom: calc(94px + env(safe-area-inset-bottom));
+    max-width: 64dvw;
+    padding: 9px 12px;
+    font-size: 14px;
+  }
+
+  .mobile-controls {
+    bottom: max(14px, env(safe-area-inset-bottom));
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+
+  .dpad button,
+  .mobile-action {
+    position: absolute;
+    display: grid;
+    place-items: center;
+    color: transparent;
+    font-size: 0;
+    overflow: hidden;
+    border: 2px solid rgba(255,255,255,.32);
+    background:
+      linear-gradient(180deg, rgba(83,96,130,.58), rgba(37,29,54,.54));
+    box-shadow:
+      inset 0 2px 0 rgba(255,255,255,.12),
+      0 7px 16px rgba(10,8,20,.16);
+    backdrop-filter: blur(7px);
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+
+  .dpad .control-icon {
+    width: 48%;
+    height: 48%;
+  }
+
+  .dpad.is-sprinting button {
+    border-color: rgba(255,216,95,.58);
+    box-shadow:
+      inset 0 2px 0 rgba(255,255,255,.16),
+      0 0 0 3px rgba(255,216,95,.12),
+      0 10px 22px rgba(255,151,61,.16);
+  }
+
+  .mobile-action {
+    position: static;
+    background:
+      radial-gradient(circle at 35% 24%, rgba(255,255,255,.22), transparent 24%),
+      linear-gradient(180deg, rgba(239,99,88,.66), rgba(200,66,61,.62));
+  }
+
+  .mobile-action .control-icon {
+    width: 58%;
+    height: 58%;
+    color: #ffe0a0;
+    filter: drop-shadow(0 2px 0 rgba(92,34,28,.45));
+  }
+}
+
+@media (max-width: 650px) and (orientation: landscape), (hover: none) and (pointer: coarse) and (orientation: landscape), (orientation: landscape) and (max-height: 760px) {
+  #gameCanvas {
+    width: auto;
+    height: auto;
+  }
+
+  .hud {
+    inset: 8px 8px auto;
+    grid-template-columns: auto minmax(210px, .65fr) auto;
+    align-items: start;
+  }
+
+  .hud-center {
+    grid-column: auto;
+    order: initial;
+  }
+}
+
+.shop-panel { box-sizing: border-box; width: min(920px, 100%); text-align: center; color: #fff; background: linear-gradient(145deg,#61372d,#2b1b2d); border: 4px solid #e4a44f; }
+.shop-panel h2 { margin: 4px 0 8px; color: #ffd85f; }
+.shop-panel p { color: rgba(255,255,255,.75); }
+.shop-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 16px; margin: 22px 0; }
+.shop-card { min-height: 180px; border: 3px solid rgba(255,216,95,.35); border-radius: 18px; color: #fff; background: rgba(255,255,255,.1); cursor: pointer; display: grid; place-items: center; gap: 5px; font: inherit; }
+.shop-card.is-selected,
+.shop-card:hover { border-color: #ffd85f; background: rgba(255,190,63,.2); transform: translateY(-3px); }
+.shop-card:disabled { opacity: .48; }
+.shop-card span { font-size: 48px; }
+.shop-card b { color: #ffd85f; }
+@media (max-width: 700px) { .shop-grid { grid-template-columns: 1fr; } .shop-card { min-height: 100px; } }
+
+@media (max-width: 650px) {
+  .shop-panel {
+    width: calc(100dvw - 48px) !important;
+    min-width: 0;
+    max-width: calc(100dvw - 48px);
+    max-height: calc(100dvh - 72px);
+    padding: 18px 14px;
+    overflow-y: auto;
+  }
+
+  .shop-panel p {
+    white-space: normal;
+    line-height: 1.25;
+    overflow-wrap: anywhere;
+    font-size: 13px;
+  }
+
+  .shop-grid {
+    gap: 12px;
+    margin: 16px 0;
+  }
+
+  .shop-card {
+    min-height: 108px;
+    padding: 12px 8px;
+  }
+
+  .shop-card span {
+    font-size: 34px;
+  }
+}

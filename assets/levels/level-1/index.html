@@ -19,8 +19,19 @@
           <span>Pizza Dash</span>
         </div>
         <div class="topbar-actions">
-          <button id="soundBtn" class="icon-button" type="button" aria-label="Activar o desactivar sonido">🔊</button>
-          <button id="pauseBtn" class="icon-button hidden" type="button" aria-label="Pausar">Ⅱ</button>
+          <button id="soundBtn" class="icon-button" type="button" aria-label="Activar o desactivar sonido">
+            <svg class="control-icon control-icon--sound" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+              <path class="sound-speaker" d="M3 9v6h4l5 4V5L7 9H3Z"></path>
+              <path class="sound-wave" d="M15 9.5c1.2 1.4 1.2 3.6 0 5M18 7c2.4 2.8 2.4 7.2 0 10"></path>
+              <path class="sound-muted" d="M4 4l16 16"></path>
+            </svg>
+          </button>
+          <button id="pauseBtn" class="icon-button hidden" type="button" aria-label="Pausar">
+            <svg class="control-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+              <rect x="6" y="5" width="4.5" height="14" rx="1.5"></rect>
+              <rect x="13.5" y="5" width="4.5" height="14" rx="1.5"></rect>
+            </svg>
+          </button>
         </div>
       </header>
 
@@ -166,6 +177,23 @@
                 </span>
                 <span class="level-stars" id="stars-2">☆ ☆ ☆</span>
               </button>
+
+              <button class="level-card level-card--four" data-level="3" data-url="../level-4/" type="button">
+                <span class="level-number">04</span>
+                <span class="level-scene">
+                  <span class="scene-industrial-sun"></span>
+                  <span class="scene-industrial-building scene-industrial-building--a"></span>
+                  <span class="scene-industrial-building scene-industrial-building--b"></span>
+                  <span class="scene-industrial-road scene-industrial-road--a"></span>
+                  <span class="scene-industrial-road scene-industrial-road--b"></span>
+                  <span class="scene-industrial-road scene-industrial-road--c"></span>
+                </span>
+                <span class="level-info">
+                  <strong>Zona Industrial</strong>
+                  <small>6 entregas · 55 segundos</small>
+                </span>
+                <span class="level-stars" id="stars-3">☆ ☆ ☆</span>
+              </button>
             </div>
           </div>
         </section>
@@ -227,7 +255,7 @@
           <div class="panel shop-panel">
             <span class="eyebrow">TIENDA DEL BARRIO</span>
             <h2>Mercado de mejoras</h2>
-            <p>WASD o flechas para elegir · Enter o Espacio para comprar</p>
+            <p>Flechas/WASD · Enter/Espacio para comprar</p>
             <div class="shop-grid">
               <button class="shop-card" id="speedUpgradeBtn" type="button"><span>🏃</span><strong>Zapatos turbo</strong><small>Velocidad +25</small><b></b></button>
               <button class="shop-card" id="capacityUpgradeBtn" type="button"><span>🍕</span><strong>Mochila grande</strong><small>Capacidad +1</small><b></b></button>
@@ -273,12 +301,26 @@
 
         <div class="mobile-controls" id="mobileControls">
           <div class="dpad">
-            <button data-key="ArrowUp" class="dpad-up" aria-label="Arriba">▲</button>
-            <button data-key="ArrowLeft" class="dpad-left" aria-label="Izquierda">◀</button>
-            <button data-key="ArrowDown" class="dpad-down" aria-label="Abajo">▼</button>
-            <button data-key="ArrowRight" class="dpad-right" aria-label="Derecha">▶</button>
+            <button data-key="ArrowUp" class="dpad-up" aria-label="Arriba">
+              <svg class="control-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 6 5 17h14L12 6Z"></path></svg>
+            </button>
+            <button data-key="ArrowLeft" class="dpad-left" aria-label="Izquierda">
+              <svg class="control-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 12 17 5v14L6 12Z"></path></svg>
+            </button>
+            <button data-key="ArrowDown" class="dpad-down" aria-label="Abajo">
+              <svg class="control-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 18 5 7h14l-7 11Z"></path></svg>
+            </button>
+            <button data-key="ArrowRight" class="dpad-right" aria-label="Derecha">
+              <svg class="control-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m18 12-11 7V5l11 7Z"></path></svg>
+            </button>
           </div>
-          <button id="mobileAction" class="mobile-action" aria-label="Entregar pizza">🍕</button>
+          <button id="mobileAction" class="mobile-action" aria-label="Entregar pizza">
+            <svg class="control-icon control-icon--box" viewBox="0 0 32 32" aria-hidden="true" focusable="false">
+              <path d="M6 9.5 16 5l10 4.5v14L16 28 6 23.5v-14Z"></path>
+              <path d="M6 9.5 16 14l10-4.5M16 14v14"></path>
+              <path d="M11 18h10M11 22h10"></path>
+            </svg>
+          </button>
         </div>
       </div>
     </section>

@@ -37,10 +37,23 @@ LEVELS.push({
   accent: "#8d5fd3",
   start: { x: 632, y: 360 }
 });
+LEVELS.push({
+  name: "Zona Industrial",
+  duration: 55,
+  required: 6,
+  traffic: 180,
+  theme: "industrial",
+  mode: "solo",
+  sky: "#f39a62",
+  grass: "#b97858",
+  road: "#62545a",
+  accent: "#e56b43",
+  start: { x: 632, y: 360 }
+});
 (() => {
   "use strict";
 
-  const LEVEL_URLS = ["../level-1/", "../level-2/", "../level-3/"];
+  const LEVEL_URLS = ["../level-1/", "../level-2/", "../level-3/", "../level-4/"];
 
   const canvas = document.getElementById("gameCanvas");
   const ctx = canvas.getContext("2d");
@@ -105,10 +118,21 @@ LEVELS.push({
   let levelIntroTimer = 0;
   let rival = null;
   let stormTimer = 0;
+  let mobileSprintActive = false;
+  let lastMobileDirectionTapAt = 0;
+  let lastMobileDirectionCode = "";
+  let mobileCameraX = 0;
+  let mobileCameraY = 0;
   const particles = [];
   const floatTexts = [];
   const MAX_PIZZAS = 2;
-  const PIZZERIA = { x: 12, y: 527, w: 205, h: 122, refillX: 114, refillY: 585, radius: 88 };
+  const CAMPAIGN_SCORE_KEY = "pizzaDashCampaignScore";
+  const LEVEL_PROGRESS_KEY = "pizzaDashLevelProgress";
+  const mobileCameraQuery = window.matchMedia("(max-width: 650px), (hover: none) and (pointer: coarse), (orientation: landscape) and (max-height: 760px)");
+  const getUpgrades = () => JSON.parse(localStorage.getItem("pizzaDashUpgrades") || '{"speed":0,"capacity":0,"health":0}');
+  const maxPizzas = () => MAX_PIZZAS + getUpgrades().capacity;
+  const maxHearts = () => 3 + getUpgrades().health;
+  const PIZZERIA = { x: 24, y: 672, w: 120, h: 42, refillX: 84, refillY: 694, radius: 36 };
 
   const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
   const lerp = (a, b, t) => a + (b - a) * t;
@@ -132,6 +156,100 @@ LEVELS.push({
     context.fill();
   }
 
+  function updateResponsiveCamera(dt) {
+    if (!mobileCameraQuery.matches) {
+      canvas.style.width = "";
+      canvas.style.height = "";
+      canvas.style.transform = "";
+      canvas.style.objectPosition = "";
+      return;
+    }
+
+    const viewport = canvas.parentElement?.getBoundingClientRect();
+    if (!viewport?.width || !viewport?.height) return;
+
+    const landscapeView = viewport.width > viewport.height;
+    const portraitView = !landscapeView;
+    const zoom = landscapeView ? 1 : 1.18;
+    const scale = Math.max(viewport.width / W, viewport.height / H) * zoom;
+    const renderedW = W * scale;
+    const renderedH = H * scale;
+    const centerX = (viewport.width - renderedW) * .5;
+    const centerY = (viewport.height - renderedH) * .5;
+    const minX = viewport.width - renderedW;
+    const minY = viewport.height - renderedH;
+    const maxY = portraitView ? Math.min(0, -54 * scale) : 0;
+    const desiredX = viewport.width * .5;
+    const desiredY = viewport.height * (landscapeView ? .58 : .56);
+    const targetX = renderedW <= viewport.width
+      ? centerX
+      : player
+      ? clamp(desiredX - player.x * scale, minX, 0)
+      : centerX;
+    const targetY = renderedH <= viewport.height
+      ? centerY
+      : player
+      ? clamp(desiredY - player.y * scale, Math.min(minY, maxY), Math.max(minY, maxY))
+      : centerY;
+    const follow = clamp(dt * (landscapeView ? 8 : 5.5), 0, 1);
+    mobileCameraX = lerp(mobileCameraX, targetX, follow);
+    mobileCameraY = lerp(mobileCameraY, targetY, follow);
+    canvas.style.width = `${renderedW.toFixed(2)}px`;
+    canvas.style.height = `${renderedH.toFixed(2)}px`;
+    canvas.style.transform = `translate3d(${mobileCameraX.toFixed(2)}px, ${mobileCameraY.toFixed(2)}px, 0)`;
+  }
+
+  function readLevelProgress() {
+    try {
+      return JSON.parse(localStorage.getItem(LEVEL_PROGRESS_KEY) || "{}");
+    } catch {
+      return {};
+    }
+  }
+
+  function loadCampaignScore() {
+    return Number(localStorage.getItem(CAMPAIGN_SCORE_KEY) || 0);
+  }
+
+  function saveCampaignScore() {
+    localStorage.setItem(CAMPAIGN_SCORE_KEY, String(Math.max(0, Math.floor(score))));
+  }
+
+  function restoreLevelProgress(index) {
+    const saved = readLevelProgress()[index];
+    if (!saved) return;
+    delivered = clamp(Number(saved.delivered ?? delivered), 0, levelData.required);
+    pizzasCarried = clamp(Number(saved.pizzasCarried ?? pizzasCarried), 0, maxPizzas());
+    hearts = clamp(Number(saved.hearts ?? hearts), 1, maxHearts());
+    currentTarget = clamp(Number(saved.currentTarget ?? currentTarget), 0, Math.max(0, world.houses.length - 1));
+    timeLeft = clamp(Number(saved.timeLeft ?? timeLeft), 1, levelData.duration);
+    if (Array.isArray(saved.picnicCollected) && world.picnicOrders) {
+      world.picnicOrders.forEach((order, orderIndex) => {
+        order.collected = Boolean(saved.picnicCollected[orderIndex]);
+      });
+    }
+  }
+
+  function saveLevelProgress() {
+    const store = readLevelProgress();
+    store[activeLevel] = {
+      delivered,
+      pizzasCarried,
+      hearts,
+      currentTarget,
+      timeLeft: Math.max(0, timeLeft),
+      picnicCollected: world?.picnicOrders?.map(order => order.collected) || [],
+      completed: levelObjectiveComplete()
+    };
+    localStorage.setItem(LEVEL_PROGRESS_KEY, JSON.stringify(store));
+  }
+
+  function travelTo(url) {
+    saveLevelProgress();
+    saveCampaignScore();
+    window.location.href = url;
+  }
+
   function rectsOverlap(a, b) {
     return a.x < b.x + b.w &&
       a.x + a.w > b.x &&
@@ -145,6 +263,69 @@ LEVELS.push({
     const dx = circle.x - closestX;
     const dy = circle.y - closestY;
     return dx * dx + dy * dy < circle.r * circle.r;
+  }
+
+  function pointInPolygon(x, y, points) {
+    let inside = false;
+    for (let i = 0, j = points.length - 1; i < points.length; j = i++) {
+      const a = points[i];
+      const b = points[j];
+      const intersects = ((a.y > y) !== (b.y > y)) &&
+        x < ((b.x - a.x) * (y - a.y)) / (b.y - a.y) + a.x;
+      if (intersects) inside = !inside;
+    }
+    return inside;
+  }
+
+  function closestPointOnSegment(px, py, a, b) {
+    const dx = b.x - a.x;
+    const dy = b.y - a.y;
+    const lengthSq = dx * dx + dy * dy || 1;
+    const t = clamp(((px - a.x) * dx + (py - a.y) * dy) / lengthSq, 0, 1);
+    return { x: a.x + dx * t, y: a.y + dy * t };
+  }
+
+  function closestPointOnObstacle(circle, obstacle) {
+    if (!obstacle.points) {
+      return {
+        x: clamp(circle.x, obstacle.x, obstacle.x + obstacle.w),
+        y: clamp(circle.y, obstacle.y, obstacle.y + obstacle.h)
+      };
+    }
+
+    let best = obstacle.points[0];
+    let bestDistance = Infinity;
+    for (let i = 0; i < obstacle.points.length; i++) {
+      const a = obstacle.points[i];
+      const b = obstacle.points[(i + 1) % obstacle.points.length];
+      const point = closestPointOnSegment(circle.x, circle.y, a, b);
+      const distanceSq = (circle.x - point.x) ** 2 + (circle.y - point.y) ** 2;
+      if (distanceSq < bestDistance) {
+        best = point;
+        bestDistance = distanceSq;
+      }
+    }
+    return best;
+  }
+
+  function circlePolygonCollision(circle, obstacle) {
+    if (!circleRectCollision(circle, obstacle)) return false;
+    if (pointInPolygon(circle.x, circle.y, obstacle.points)) return true;
+    for (let i = 0; i < obstacle.points.length; i++) {
+      const a = obstacle.points[i];
+      const b = obstacle.points[(i + 1) % obstacle.points.length];
+      const point = closestPointOnSegment(circle.x, circle.y, a, b);
+      const dx = circle.x - point.x;
+      const dy = circle.y - point.y;
+      if (dx * dx + dy * dy < circle.r * circle.r) return true;
+    }
+    return false;
+  }
+
+  function circleObstacleCollision(circle, obstacle) {
+    return obstacle.points
+      ? circlePolygonCollision(circle, obstacle)
+      : circleRectCollision(circle, obstacle);
   }
 
   function pointInRect(x, y, rect, pad = 0) {
@@ -201,6 +382,27 @@ LEVELS.push({
     }
   }
 
+  function updateSoundButtonState() {
+    el.soundBtn.classList.toggle("is-muted", !audioEnabled);
+    el.soundBtn.setAttribute("aria-label", audioEnabled ? "Desactivar sonido" : "Activar sonido");
+  }
+
+  function setMobileSprintActive(active) {
+    mobileSprintActive = active;
+    if (active) {
+      keys.add("ShiftLeft");
+    } else {
+      keys.delete("ShiftLeft");
+    }
+    document.querySelector(".dpad")?.classList.toggle("is-sprinting", active);
+  }
+
+  function clearMobileSprint() {
+    setMobileSprintActive(false);
+    lastMobileDirectionTapAt = 0;
+    lastMobileDirectionCode = "";
+  }
+
   function showOnly(screen) {
     [el.menu, el.level, el.how, el.pause, el.result].forEach(node => node.classList.add("hidden"));
     if (screen) screen.classList.remove("hidden");
@@ -231,10 +433,10 @@ LEVELS.push({
   }
 
   function refreshLevelStars() {
-    LEVELS.forEach((_, index) => {
+    LEVEL_URLS.forEach((_, index) => {
       const value = Number(localStorage.getItem(`pizzaDashStars${index}`) || 0);
       const node = document.getElementById(`stars-${index}`);
-      node.textContent = `${"★ ".repeat(value)}${"☆ ".repeat(3 - value)}`.trim();
+      if (node) node.textContent = `${"★ ".repeat(value)}${"☆ ".repeat(3 - value)}`.trim();
     });
   }
 
@@ -255,7 +457,7 @@ LEVELS.push({
     const roads = theme === "park"
       ? [
           { x: 0, y: 500, w: W, h: 145, axis: "x" },
-          { x: 520, y: 0, w: 160, h: H, axis: "y" }
+          { x: 520, y: 104, w: 160, h: H - 104, axis: "y" }
         ]
       : [
           { x: 0, y: 285, w: W, h: 150, axis: "x" },
@@ -288,7 +490,7 @@ LEVELS.push({
       });
     }
 
-    const obstacles = houses.flatMap(house => makeHouseObstacles(house, theme === "park"));
+    const obstacles = houses.flatMap(house => makeHouseObstacles(house));
     const trees = [];
     const benches = [];
     const puddles = [];
@@ -298,9 +500,9 @@ LEVELS.push({
 
     const treeSpots = theme === "park"
       ? [
-          [330, 90], [410, 160], [790, 80], [865, 170],
-          [360, 365], [840, 365], [325, 570], [900, 590],
-          [470, 260], [770, 260]
+          [330, 112], [410, 170], [790, 126], [875, 175],
+          [360, 365], [842, 386],
+          [450, 270], [1030, 286]
         ]
       : [
           [318, 112], [970, 112], [320, 548], [975, 548],
@@ -322,13 +524,13 @@ LEVELS.push({
       cats.push(makeCat(420, 455, 72, "x"));
       cats.push(makeCat(820, 120, 66, "y"));
       cyclists.push(
-        makeCyclist(305, 315, "x", 305, 495, 112, "#d94b55"),
-        makeCyclist(700, 220, "y", 220, 465, 96, "#347db7")
+        makeCyclist(305, 315, "x", 305, 475, 112, "#d94b55"),
+        makeCyclist(900, 230, "y", 230, 430, 96, "#347db7")
       );
       picnicOrders.push(
-        { x: 430, y: 410, collected: false, phase: rand(0, Math.PI * 2) },
-        { x: 835, y: 315, collected: false, phase: rand(0, Math.PI * 2) },
-        { x: 1080, y: 290, collected: false, phase: rand(0, Math.PI * 2) }
+        { x: 392, y: 430, collected: false, phase: rand(0, Math.PI * 2) },
+        { x: 820, y: 350, collected: false, phase: rand(0, Math.PI * 2) },
+        { x: 1090, y: 300, collected: false, phase: rand(0, Math.PI * 2) }
       );
     } else {
       puddles.push({ x: 815, y: 455, rx: 42, ry: 17 });
@@ -343,16 +545,13 @@ LEVELS.push({
       );
     }
 
-    const cars = createTraffic(roads, levelIndex);
+    const intersections = createIntersections(roads);
+    const traffic = createTraffic(roads, levelIndex, intersections);
 
-    const coins = [
-      { x: 330, y: 245, taken: false, phase: rand(0, 6.2) },
-      { x: 950, y: 250, taken: false, phase: rand(0, 6.2) },
-      { x: 330, y: 460, taken: false, phase: rand(0, 6.2) },
-      { x: 950, y: 460, taken: false, phase: rand(0, 6.2) },
-      { x: 630, y: 250, taken: false, phase: rand(0, 6.2) },
-      { x: 630, y: 470, taken: false, phase: rand(0, 6.2) }
-    ];
+    const coinSpots = theme === "park"
+      ? [[350, 260], [915, 260], [355, 455], [920, 455], [780, 335], [1080, 265]]
+      : [[330, 245], [950, 250], [330, 460], [950, 460], [630, 250], [630, 470]];
+    const coins = coinSpots.map(([x, y]) => ({ x, y, taken: false, phase: rand(0, 6.2) }));
 
     const flowerSeed = [];
     for (let i = 0; i < 90; i++) {
@@ -365,77 +564,436 @@ LEVELS.push({
 
     const crosswalks = createCrosswalks(roads);
 
-    return { roads, houses, obstacles, trees, benches, puddles, cats, cyclists, picnicOrders, cars, coins, flowerSeed, crosswalks, lightning: [] };
+    return {
+      roads,
+      houses,
+      obstacles,
+      trees,
+      benches,
+      puddles,
+      cats,
+      cyclists,
+      picnicOrders,
+      cars: traffic.cars,
+      trafficSpawns: traffic.spawns,
+      trafficReservations: [],
+      trafficClock: 0,
+      coins,
+      flowerSeed,
+      crosswalks,
+      intersections,
+      lightning: []
+    };
   }
 
   function makeHouse(x, y, w, h, wall, roof, doorX, doorY) {
     return { x, y, w, h, wall, roof, doorX, doorY, night: false };
   }
 
-  function makeHouseObstacles(house, blockRoof = false) {
+  function makeHouseObstacles(house) {
+    const roofPoints = [
+      { x: house.x - 15, y: house.y + 20 },
+      { x: house.x + house.w / 2, y: house.y - 42 },
+      { x: house.x + house.w + 15, y: house.y + 20 }
+    ];
+    const roof = {
+      x: house.x - 15,
+      y: house.y - 42,
+      w: house.w + 30,
+      h: 62,
+      points: roofPoints,
+      type: "roof"
+    };
     const body = {
-      x: blockRoof ? house.x - 10 : house.x + 16,
-      y: blockRoof ? house.y - 30 : house.y + 24,
-      w: blockRoof ? house.w + 20 : house.w - 32,
-      h: Math.max(48, blockRoof ? house.h - 24 : house.h - 78),
+      x: house.x + 5,
+      y: house.y + 8,
+      w: house.w - 10,
+      h: Math.max(44, house.h - 8),
       type: "house"
     };
     const leftShrub = { x: house.x + 2, y: house.y + house.h - 24, w: 34, h: 30, type: "yard" };
     const rightShrub = { x: house.x + house.w - 36, y: house.y + house.h - 24, w: 34, h: 30, type: "yard" };
-    return [body, leftShrub, rightShrub];
+    return [roof, body, leftShrub, rightShrub];
   }
 
-  function makeCar(x, y, w, h, dx, dy, color, speed, lane) {
-    return { x, y, w, h, dx, dy, color, speed, lane, hornCooldown: rand(1.5, 4) };
+  function makeCar(spawn, color, speed, id) {
+    const car = {
+      id,
+      x: spawn.entry.x,
+      y: spawn.entry.y,
+      cx: spawn.entry.x,
+      cy: spawn.entry.y,
+      w: 92,
+      h: 48,
+      dx: spawn.startDx,
+      dy: spawn.startDy,
+      color,
+      speed,
+      heading: Math.atan2(spawn.startDy, spawn.startDx),
+      lane: spawn.lane,
+      route: spawn.route,
+      routeLength: spawn.routeLength,
+      progress: 0,
+      entry: spawn.entry,
+      exit: spawn.exit,
+      intersections: spawn.intersections,
+      hornCooldown: rand(1.5, 4),
+      waiting: false,
+      waitTimer: 0,
+      done: false
+    };
+    syncCarBounds(car);
+    return car;
   }
 
-  function createTraffic(roads, levelIndex) {
-    const colors = ["#e75245", "#477ec2", "#f2b640", "#7b55b7", "#48a56a", "#e57a3c", "#40a9a8"];
-    const multiplier = levelIndex === 0 ? 1 : levelIndex === 1 ? 1.08 : 1.28;
-    const cars = [];
-    let colorIndex = 0;
+  function carRectAt(car, x = car.x, y = car.y, pad = 0) {
+    return { x: x - pad, y: y - pad, w: car.w + pad * 2, h: car.h + pad * 2 };
+  }
 
-    for (const road of roads) {
-      if (road.axis === "x") {
-        const laneGap = road.h / 4;
-        [-1, 1].forEach((direction, laneIndex) => {
-          cars.push(makeCar(
-            direction > 0 ? -160 - laneIndex * 310 : W + 160 + laneIndex * 280,
-            road.y + laneGap * (laneIndex + 1) - 24,
-            92,
-            48,
-            direction,
-            0,
-            colors[colorIndex++ % colors.length],
-            levelData.traffic * multiplier * (laneIndex ? .92 : 1),
-            { axis: "x", road }
-          ));
-        });
-        if (levelIndex >= 1) {
-          cars.push(makeCar(W + 520, road.y + laneGap * 3 - 24, 92, 48, -1, 0, colors[colorIndex++ % colors.length], levelData.traffic * multiplier * 1.06, { axis: "x", road }));
-        }
-      } else {
-        const laneGap = road.w / 4;
-        [-1, 1].forEach((direction, laneIndex) => {
-          cars.push(makeCar(
-            road.x + laneGap * (laneIndex + 1) - 24,
-            direction > 0 ? -170 - laneIndex * 260 : H + 170 + laneIndex * 300,
-            48,
-            92,
-            0,
-            direction,
-            colors[colorIndex++ % colors.length],
-            levelData.traffic * multiplier * (laneIndex ? .86 : .96),
-            { axis: "y", road }
-          ));
-        });
-        if (levelIndex === 2) {
-          cars.push(makeCar(road.x + laneGap * 3 - 24, H + 570, 48, 92, 0, -1, colors[colorIndex++ % colors.length], levelData.traffic * multiplier * 1.08, { axis: "y", road }));
-        }
+  function normalizeAngle(angle) {
+    while (angle > Math.PI) angle -= Math.PI * 2;
+    while (angle < -Math.PI) angle += Math.PI * 2;
+    return angle;
+  }
+
+  function carSizeForHeading(heading) {
+    const c = Math.abs(Math.cos(heading));
+    const s = Math.abs(Math.sin(heading));
+    return {
+      w: 92 * c + 48 * s,
+      h: 92 * s + 48 * c
+    };
+  }
+
+  function carRectFromCenter(cx, cy, heading, pad = 0) {
+    const size = carSizeForHeading(heading);
+    return {
+      x: cx - size.w / 2 - pad,
+      y: cy - size.h / 2 - pad,
+      w: size.w + pad * 2,
+      h: size.h + pad * 2
+    };
+  }
+
+  function syncCarBounds(car) {
+    const size = carSizeForHeading(car.heading);
+    car.w = size.w;
+    car.h = size.h;
+    car.x = car.cx - car.w / 2;
+    car.y = car.cy - car.h / 2;
+  }
+
+  function buildSmoothRoute(points, radius = 74) {
+    const samples = [];
+    const addSample = (x, y) => {
+      const previous = samples[samples.length - 1];
+      if (!previous || Math.hypot(previous.x - x, previous.y - y) > .5) samples.push({ x, y });
+    };
+
+    addSample(points[0].x, points[0].y);
+    for (let i = 1; i < points.length - 1; i++) {
+      const previous = points[i - 1];
+      const corner = points[i];
+      const next = points[i + 1];
+      const inLength = Math.hypot(corner.x - previous.x, corner.y - previous.y);
+      const outLength = Math.hypot(next.x - corner.x, next.y - corner.y);
+      const curveRadius = Math.min(radius, inLength * .42, outLength * .42);
+
+      if (curveRadius < 8) {
+        addSample(corner.x, corner.y);
+        continue;
+      }
+
+      const inDx = (corner.x - previous.x) / inLength;
+      const inDy = (corner.y - previous.y) / inLength;
+      const outDx = (next.x - corner.x) / outLength;
+      const outDy = (next.y - corner.y) / outLength;
+      const start = { x: corner.x - inDx * curveRadius, y: corner.y - inDy * curveRadius };
+      const end = { x: corner.x + outDx * curveRadius, y: corner.y + outDy * curveRadius };
+
+      addSample(start.x, start.y);
+      for (let step = 1; step <= 14; step++) {
+        const t = step / 14;
+        const inv = 1 - t;
+        addSample(
+          inv * inv * start.x + 2 * inv * t * corner.x + t * t * end.x,
+          inv * inv * start.y + 2 * inv * t * corner.y + t * t * end.y
+        );
       }
     }
+    addSample(points[points.length - 1].x, points[points.length - 1].y);
+    return samples;
+  }
 
-    return cars;
+  function routeLength(route) {
+    let length = 0;
+    for (let i = 1; i < route.length; i++) {
+      length += Math.hypot(route[i].x - route[i - 1].x, route[i].y - route[i - 1].y);
+    }
+    return length;
+  }
+
+  function routePointAt(route, distance) {
+    let remaining = distance;
+    for (let i = 1; i < route.length; i++) {
+      const from = route[i - 1];
+      const to = route[i];
+      const length = Math.hypot(to.x - from.x, to.y - from.y) || 1;
+      if (remaining <= length) {
+        const t = remaining / length;
+        return {
+          x: from.x + (to.x - from.x) * t,
+          y: from.y + (to.y - from.y) * t,
+          dx: (to.x - from.x) / length,
+          dy: (to.y - from.y) / length
+        };
+      }
+      remaining -= length;
+    }
+    const last = route[route.length - 1];
+    const prev = route[route.length - 2] || last;
+    const length = Math.hypot(last.x - prev.x, last.y - prev.y) || 1;
+    return { x: last.x, y: last.y, dx: (last.x - prev.x) / length, dy: (last.y - prev.y) / length };
+  }
+
+  function computeConflictOffsets(route, intersection) {
+    const length = routeLength(route);
+    let enter = null;
+    let exit = null;
+    for (let distance = 0; distance <= length; distance += 5) {
+      const point = routePointAt(route, distance);
+      const hitbox = carRectFromCenter(point.x, point.y, Math.atan2(point.dy, point.dx), 34);
+      if (rectsOverlap(hitbox, intersection)) {
+        if (enter === null) enter = distance;
+        exit = distance;
+      }
+    }
+    if (enter === null) return { enter: 0, exit: 0 };
+    return { enter, exit: Math.min(length, exit + 24) };
+  }
+
+  function updateCarDirection(car, dt = 1 / 60) {
+    const point = routePointAt(car.route, car.progress);
+    car.cx = point.x;
+    car.cy = point.y;
+    car.dx = point.dx;
+    car.dy = point.dy;
+    const targetHeading = Math.atan2(point.dy, point.dx);
+    const turnSpeed = 8.5;
+    car.heading += normalizeAngle(targetHeading - car.heading) * Math.min(1, turnSpeed * dt);
+    syncCarBounds(car);
+  }
+
+  function advanceCar(car, distance, dt) {
+    car.progress += distance;
+    if (car.progress >= car.routeLength) {
+      car.done = true;
+      car.progress = car.routeLength;
+    }
+    updateCarDirection(car, dt);
+  }
+
+  function sameTrafficLane(a, b) {
+    if (!a.lane || !b.lane || a.lane.axis !== b.lane.axis || a.lane.road !== b.lane.road) return false;
+    if (a.dx !== b.dx || a.dy !== b.dy) return false;
+    return a.lane.axis === "x"
+      ? Math.abs(a.y - b.y) < 12
+      : Math.abs(a.x - b.x) < 12;
+  }
+
+  function getTrafficProgress(car) {
+    return car.progress;
+  }
+
+  function createIntersections(roads) {
+    const horizontal = roads.find(road => road.axis === "x");
+    const vertical = roads.find(road => road.axis === "y");
+    if (!horizontal || !vertical) return [];
+    return [{
+      x: vertical.x - 18,
+      y: horizontal.y - 18,
+      w: vertical.w + 36,
+      h: horizontal.h + 36
+    }];
+  }
+
+  function trafficSpawnRect(spawn, pad = 0) {
+    return carRectFromCenter(spawn.entry.x, spawn.entry.y, spawn.startHeading, pad);
+  }
+
+  function canSpawnTraffic(spawn) {
+    const entry = trafficSpawnRect(spawn, 70);
+    return !world.cars.some(car => {
+      if (car.lane?.startKey !== spawn.startKey) return rectsOverlap(carRectAt(car, car.x, car.y, 12), entry);
+      const gap = Math.abs(getTrafficProgress(car));
+      return gap < 250 || rectsOverlap(carRectAt(car, car.x, car.y, 16), entry);
+    });
+  }
+
+  function getIntersectionWindow(spawn) {
+    return {
+      enter: world.trafficClock + spawn.conflict.enter / spawn.speed,
+      exit: world.trafficClock + spawn.conflict.exit / spawn.speed
+    };
+  }
+
+  function trafficWindowsOverlap(a, b) {
+    return a.enter < b.exit + .18 && b.enter < a.exit + .18;
+  }
+
+  function canReserveTrafficSlot(spawn) {
+    if (!spawn.conflict) return true;
+    const window = getIntersectionWindow(spawn);
+    return !world.trafficReservations.some(slot => trafficWindowsOverlap(slot, window));
+  }
+
+  function reserveTrafficSlot(spawn) {
+    if (!spawn.conflict) return;
+    const window = getIntersectionWindow(spawn);
+    world.trafficReservations.push({
+      route: spawn.name,
+      enter: window.enter,
+      exit: window.exit
+    });
+  }
+
+  function cleanupTrafficReservations() {
+    world.trafficReservations = world.trafficReservations.filter(slot =>
+      slot.exit > world.trafficClock - .35
+    );
+  }
+
+  function spawnTrafficCar(spawn) {
+    const id = `level-${activeLevel}-traffic-${spawn.name}-${spawn.sequence++}`;
+    reserveTrafficSlot(spawn);
+    world.cars.push(makeCar(spawn, spawn.color, spawn.speed, id));
+  }
+
+  function updateTrafficSpawns(dt) {
+    if (!world.trafficSpawns?.length) return;
+    cleanupTrafficReservations();
+    for (const spawn of world.trafficSpawns) {
+      spawn.timer -= dt;
+      if (spawn.timer > 0) continue;
+      if (canSpawnTraffic(spawn) && canReserveTrafficSlot(spawn)) {
+        spawnTrafficCar(spawn);
+        spawn.timer = spawn.interval;
+      } else {
+        spawn.timer = .18;
+      }
+    }
+  }
+
+  function createTraffic(roads, levelIndex, intersections) {
+    const colors = ["#e75245", "#477ec2", "#f2b640", "#7b55b7", "#48a56a", "#e57a3c", "#40a9a8"];
+    const multiplier = levelIndex === 0 ? 1 : levelIndex === 1 ? 1.08 : 1.28;
+    const horizontal = roads.find(road => road.axis === "x");
+    const vertical = roads.find(road => road.axis === "y");
+    if (!horizontal || !vertical) return { cars: [], spawns: [] };
+
+    const laneGapX = horizontal.h / 4;
+    const laneGapY = vertical.w / 4;
+    const intersectionIds = intersections.map((_, index) => index);
+    const baseSpeed = LEVELS[levelIndex].traffic * multiplier;
+    const westEastY = horizontal.y + laneGapX * 3;
+    const eastWestY = horizontal.y + laneGapX;
+    const northSouthX = vertical.x + laneGapY;
+    const southNorthX = vertical.x + laneGapY * 3;
+    const topVerticalY = vertical.y + 46;
+    const west = { x: -92, y: westEastY };
+    const east = { x: W + 92, y: eastWestY };
+    const north = { x: northSouthX, y: topVerticalY };
+    const south = { x: southNorthX, y: H + 92 };
+    const laneSpecs = [
+      {
+        name: "west-east",
+        waypoints: [west, { x: W + 92, y: westEastY }],
+        speed: baseSpeed * .86,
+        interval: 4.4,
+        delay: .25
+      },
+      {
+        name: "east-west",
+        waypoints: [east, { x: -92, y: eastWestY }],
+        speed: baseSpeed * .86,
+        interval: 4.55,
+        delay: 1.35
+      },
+      {
+        name: "north-south",
+        waypoints: [north, { x: northSouthX, y: H + 92 }],
+        speed: baseSpeed * .8,
+        interval: 4.75,
+        delay: 2.35
+      },
+      {
+        name: "south-north",
+        waypoints: [south, { x: southNorthX, y: topVerticalY }],
+        speed: baseSpeed * .8,
+        interval: 4.95,
+        delay: 3.25
+      },
+      {
+        name: "west-north",
+        waypoints: [west, { x: southNorthX, y: westEastY }, { x: southNorthX, y: topVerticalY }],
+        speed: baseSpeed * .78,
+        interval: 6.2,
+        delay: 4.35
+      },
+      {
+        name: "north-east",
+        waypoints: [north, { x: northSouthX, y: westEastY }, { x: W + 92, y: westEastY }],
+        speed: baseSpeed * .78,
+        interval: 6.5,
+        delay: 5.35
+      },
+      {
+        name: "east-south",
+        waypoints: [east, { x: northSouthX, y: eastWestY }, { x: northSouthX, y: H + 92 }],
+        speed: baseSpeed * .78,
+        interval: 6.35,
+        delay: 6.35
+      },
+      {
+        name: "south-west",
+        waypoints: [south, { x: southNorthX, y: eastWestY }, { x: -92, y: eastWestY }],
+        speed: baseSpeed * .78,
+        interval: 6.7,
+        delay: 7.35
+      }
+    ];
+
+    const spawns = laneSpecs.map((spec, index) => {
+      const route = buildSmoothRoute(spec.waypoints);
+      const first = route[0];
+      const second = route[1];
+      const length = Math.hypot(second.x - first.x, second.y - first.y) || 1;
+      const axis = Math.abs(second.x - first.x) > Math.abs(second.y - first.y) ? "x" : "y";
+      const startKey = `${Math.round(first.x)}:${Math.round(first.y)}:${Math.round((second.x - first.x) / length)}:${Math.round((second.y - first.y) / length)}`;
+      const lane = { axis, road: axis === "x" ? horizontal : vertical, name: spec.name, startKey };
+      const routeTotal = routeLength(route);
+      return {
+        ...spec,
+        axis,
+        startDx: (second.x - first.x) / length,
+        startDy: (second.y - first.y) / length,
+        startHeading: Math.atan2(second.y - first.y, second.x - first.x),
+        startKey,
+        lane,
+        route,
+        entry: route[0],
+        exit: route[route.length - 1],
+        routeLength: routeTotal,
+        conflict: intersections[0] ? computeConflictOffsets(route, intersections[0]) : null,
+        intersections: intersectionIds,
+        timer: spec.delay,
+        color: colors[index % colors.length],
+        colorIndex: index,
+        sequence: 0
+      };
+    });
+
+    return { cars: [], spawns };
   }
 
   function createCrosswalks(roads) {
@@ -474,7 +1032,7 @@ LEVELS.push({
       x: levelData.start.x,
       y: levelData.start.y,
       r: 20,
-      speed: 215,
+      speed: 215 + getUpgrades().speed * 25,
       facing: "right",
       moving: false,
       bump: 0,
@@ -486,14 +1044,15 @@ LEVELS.push({
     stormTimer = levelData.mode === "stormRace" ? 3.8 : 0;
     timeLeft = levelData.duration;
     delivered = 0;
-    score = 0;
-    hearts = 3;
-    pizzasCarried = MAX_PIZZAS;
+    score = loadCampaignScore();
+    hearts = maxHearts();
+    pizzasCarried = maxPizzas();
     currentTarget = 0;
     invulnerable = 0;
     actionCooldown = 0;
     deliveryCombo = 0;
     lastDeliveryAt = 0;
+    restoreLevelProgress(index);
     particles.length = 0;
     floatTexts.length = 0;
     state = "playing";
@@ -556,10 +1115,11 @@ LEVELS.push({
     player.x = clamp(player.x, player.r + 8, W - player.r - 8);
     player.y = clamp(player.y, player.r + 62, H - player.r - 8);
     for (let i = 0; i < 10; i++) {
-      const obstacle = world.obstacles.find(o => circleRectCollision(player, o));
+      const obstacle = world.obstacles.find(o => circleObstacleCollision(player, o));
       if (!obstacle) return;
-      const cx = clamp(player.x, obstacle.x, obstacle.x + obstacle.w);
-      const cy = clamp(player.y, obstacle.y, obstacle.y + obstacle.h);
+      const point = closestPointOnObstacle(player, obstacle);
+      const cx = point.x;
+      const cy = point.y;
       const angle = Math.atan2(player.y - cy, player.x - cx) || -Math.PI / 2;
       player.x += Math.cos(angle) * 8;
       player.y += Math.sin(angle) * 8;
@@ -574,13 +1134,24 @@ LEVELS.push({
 
   function resolveCircleObstacles(circle, iterations) {
     for (let i = 0; i < iterations; i++) {
-      const obstacle = world.obstacles.find(o => circleRectCollision(circle, o));
+      const obstacle = world.obstacles.find(o => circleObstacleCollision(circle, o));
       if (!obstacle) return;
-      const closestX = clamp(circle.x, obstacle.x, obstacle.x + obstacle.w);
-      const closestY = clamp(circle.y, obstacle.y, obstacle.y + obstacle.h);
+      const closest = closestPointOnObstacle(circle, obstacle);
+      const closestX = closest.x;
+      const closestY = closest.y;
       let dx = circle.x - closestX;
       let dy = circle.y - closestY;
       let length = Math.hypot(dx, dy);
+      const insidePolygon = obstacle.points && pointInPolygon(circle.x, circle.y, obstacle.points);
+      if (insidePolygon) {
+        const center = obstacle.points.reduce((sum, point) => ({
+          x: sum.x + point.x / obstacle.points.length,
+          y: sum.y + point.y / obstacle.points.length
+        }), { x: 0, y: 0 });
+        dx = circle.x - center.x;
+        dy = circle.y - center.y;
+        length = Math.hypot(dx, dy);
+      }
       if (length < .001) {
         const left = Math.abs(circle.x - obstacle.x);
         const right = Math.abs(obstacle.x + obstacle.w - circle.x);
@@ -591,14 +1162,17 @@ LEVELS.push({
         dy = min === top ? -1 : min === bottom ? 1 : 0;
         length = 1;
       }
-      const overlap = Math.max(0, circle.r - length + 1.5);
+      const edgeDistance = Math.hypot(circle.x - closestX, circle.y - closestY);
+      const overlap = insidePolygon
+        ? circle.r + edgeDistance + 1.5
+        : Math.max(0, circle.r - length + 1.5);
       circle.x = clamp(circle.x + (dx / length) * overlap, circle.r + 8, W - circle.r - 8);
       circle.y = clamp(circle.y + (dy / length) * overlap, circle.r + 62, H - circle.r - 8);
     }
   }
 
   function placePlayerSafely() {
-    if (!world.obstacles.some(o => circleRectCollision(player, o))) return;
+    if (!world.obstacles.some(o => circleObstacleCollision(player, o))) return;
     const roadCenters = world.roads.flatMap(road => road.axis === "x"
       ? [
           { x: 132, y: road.y + road.h / 2 },
@@ -611,7 +1185,7 @@ LEVELS.push({
           { x: road.x + road.w / 2, y: H / 2 }
         ]
     );
-    const safe = roadCenters.find(point => !world.obstacles.some(o => circleRectCollision({ ...point, r: player.r }, o)));
+    const safe = roadCenters.find(point => !world.obstacles.some(o => circleObstacleCollision({ ...point, r: player.r }, o)));
     if (safe) {
       player.x = safe.x;
       player.y = safe.y;
@@ -630,7 +1204,7 @@ LEVELS.push({
       return;
     }
 
-    timeLeft -= dt;
+    if (!levelObjectiveComplete()) timeLeft -= dt;
     levelIntroTimer = Math.max(0, levelIntroTimer - dt);
     invulnerable = Math.max(0, invulnerable - dt);
     actionCooldown = Math.max(0, actionCooldown - dt);
@@ -663,6 +1237,7 @@ LEVELS.push({
     if (yAxis > 0 && Math.abs(yAxis) > Math.abs(xAxis)) player.facing = "down";
 
     movePlayer(xAxis * speed * dt, yAxis * speed * dt);
+    if (tryExitLevel()) return;
     if (player.moving && sprinting) {
       player.trailTimer -= dt;
       if (player.trailTimer <= 0) {
@@ -692,7 +1267,7 @@ LEVELS.push({
     updateParticles(dt);
     updateFloatTexts(dt);
 
-    if (timeLeft <= 0 || hearts <= 0) {
+    if ((timeLeft <= 0 && !levelObjectiveComplete()) || hearts <= 0) {
       finishLevel(false);
     }
 
@@ -706,26 +1281,18 @@ LEVELS.push({
   }
 
   function updateCars(dt) {
+    world.trafficClock += dt;
+    updateTrafficSpawns(dt);
     for (const car of world.cars) {
-      const nextX = car.x + car.dx * car.speed * dt;
-      const nextY = car.y + car.dy * car.speed * dt;
-      if (!shouldYieldAtIntersection(car, nextX, nextY)) {
-        car.x = nextX;
-        car.y = nextY;
-      }
+      advanceCar(car, car.speed * dt, dt);
+      car.waiting = false;
+      car.waitTimer = 0;
       car.hornCooldown -= dt;
+    }
 
-      if (car.lane?.axis === "x") {
-        car.y = clamp(car.y, car.lane.road.y + 10, car.lane.road.y + car.lane.road.h - car.h - 10);
-      } else if (car.lane?.axis === "y") {
-        car.x = clamp(car.x, car.lane.road.x + 10, car.lane.road.x + car.lane.road.w - car.w - 10);
-      }
+    world.cars = world.cars.filter(car => !car.done);
 
-      if (car.dx > 0 && car.x > W + 130) car.x = -150 - rand(0, 220);
-      if (car.dx < 0 && car.x < -150) car.x = W + 130 + rand(0, 220);
-      if (car.dy > 0 && car.y > H + 140) car.y = -170 - rand(0, 220);
-      if (car.dy < 0 && car.y < -170) car.y = H + 140 + rand(0, 220);
-
+    for (const car of world.cars) {
       const hitbox = getCarHitbox(car);
       if (invulnerable <= 0 && circleRectCollision(player, hitbox)) {
         hitPlayer(car);
@@ -733,34 +1300,8 @@ LEVELS.push({
     }
   }
 
-  function getCarHitbox(car, x = car.x, y = car.y) {
-    return { x: x + 7, y: y + 7, w: car.w - 14, h: car.h - 14 };
-  }
-
-  function shouldYieldAtIntersection(car, nextX, nextY) {
-    const horizontalRoad = world.roads.find(road => road.axis === "x");
-    const verticalRoad = world.roads.find(road => road.axis === "y");
-    if (!horizontalRoad || !verticalRoad || !car.lane) return false;
-
-    const intersection = {
-      x: verticalRoad.x,
-      y: horizontalRoad.y,
-      w: verticalRoad.w,
-      h: horizontalRoad.h
-    };
-    const currentBox = getCarHitbox(car);
-    const nextBox = getCarHitbox(car, nextX, nextY);
-    const enteringIntersection = !rectsOverlap(currentBox, intersection) && rectsOverlap(nextBox, intersection);
-    if (!enteringIntersection) return false;
-
-    const greenAxis = Math.floor(animationClock / 4) % 2 === 0 ? "x" : "y";
-    if (car.lane.axis !== greenAxis) return true;
-
-    return world.cars.some(other =>
-      other !== car &&
-      other.lane?.axis !== car.lane.axis &&
-      rectsOverlap(getCarHitbox(other), intersection)
-    );
+  function getCarHitbox(car, x = car.x, y = car.y, pad = 0) {
+    return { x: x + 7 - pad, y: y + 7 - pad, w: car.w - 14 + pad * 2, h: car.h - 14 + pad * 2 };
   }
 
   function updateCats(dt) {
@@ -834,6 +1375,7 @@ LEVELS.push({
       if (!coin.taken && Math.hypot(player.x - coin.x, player.y - coin.y) < player.r + 15) {
         coin.taken = true;
         score += 50;
+        saveCampaignScore();
         burst(coin.x, coin.y, "#ffd15b", 12);
         spawnText(coin.x, coin.y - 28, "+50", "#f2a82f");
         sound("coin");
@@ -848,6 +1390,7 @@ LEVELS.push({
         order.collected = true;
         collectedAny = true;
         score += 75;
+        saveCampaignScore();
         burst(order.x, order.y, "#f3c45b", 14);
         spawnText(order.x, order.y - 30, "PEDIDO +75", "#3e9b5f");
         showToast("Pedido de picnic recogido");
@@ -855,8 +1398,8 @@ LEVELS.push({
       }
     }
 
-    if (collectedAny && !hasPendingPicnicOrders() && delivered >= levelData.required) {
-      setTimeout(() => finishLevel(true), 520);
+    if (collectedAny && levelObjectiveComplete()) {
+      showToast("Objetivo listo. Sal por la derecha");
     }
   }
 
@@ -864,14 +1407,60 @@ LEVELS.push({
     return world.picnicOrders.some(order => !order.collected);
   }
 
+  function levelObjectiveComplete() {
+    return delivered >= levelData.required && !hasPendingPicnicOrders();
+  }
+
+  function tryExitLevel() {
+    const entryRoad = world.roads.some(road =>
+      road.axis === "x" &&
+      player.x <= player.r + 10 &&
+      player.y > road.y + 18 &&
+      player.y < road.y + road.h - 18
+    );
+    if (entryRoad) {
+      const previousUrl = LEVEL_URLS[activeLevel - 1];
+      if (previousUrl) {
+        state = "transitioning";
+        showToast(`Volviendo al nivel ${activeLevel}`);
+        const targetUrl = activeLevel === 1
+          ? `${previousUrl}?shop=1&return=${encodeURIComponent(LEVEL_URLS[activeLevel])}`
+          : previousUrl;
+        setTimeout(() => { travelTo(targetUrl); }, 650);
+        return true;
+      }
+    }
+
+    if (!levelObjectiveComplete()) return false;
+    const exitRoad = world.roads.some(road =>
+      road.axis === "x" &&
+      player.x >= W - player.r - 10 &&
+      player.y > road.y + 18 &&
+      player.y < road.y + road.h - 18
+    );
+    if (!exitRoad) return false;
+
+    const nextUrl = LEVEL_URLS[activeLevel + 1];
+    if (nextUrl) {
+      state = "transitioning";
+      showToast(`Nivel ${activeLevel + 2}: en camino`);
+      setTimeout(() => { travelTo(nextUrl); }, 650);
+    } else {
+      saveLevelProgress();
+      saveCampaignScore();
+      finishLevel(true);
+    }
+    return true;
+  }
+
   function updatePizzeriaRefill() {
-    if (pizzasCarried >= MAX_PIZZAS) return;
+    if (pizzasCarried >= maxPizzas()) return;
     const nearPizzeria = Math.hypot(player.x - PIZZERIA.refillX, player.y - PIZZERIA.refillY) < PIZZERIA.radius;
     if (!nearPizzeria) return;
-    pizzasCarried = MAX_PIZZAS;
+    pizzasCarried = maxPizzas();
     burst(PIZZERIA.refillX, PIZZERIA.refillY, "#ffd25d", 18);
-    spawnText(PIZZERIA.refillX, PIZZERIA.refillY - 38, "RECARGA x2", "#f2a82f");
-    showToast("Mochila recargada: 2 pizzas");
+    spawnText(PIZZERIA.refillX, PIZZERIA.refillY - 38, `RECARGA x${maxPizzas()}`, "#f2a82f");
+    showToast(`Mochila recargada: ${maxPizzas()} pizzas`);
     sound("coin");
     updateHud();
   }
@@ -904,7 +1493,7 @@ LEVELS.push({
       burst(target.x, target.y, rival.color, 12);
       spawnText(target.x, target.y - 30, "RIVAL +1", rival.color);
       rival.target = findNextTarget(rival.target + 1);
-      if (rival.delivered >= levelData.required) {
+      if (rival.delivered >= levelData.required && !levelObjectiveComplete()) {
         showToast("El rival entregó primero");
         setTimeout(() => finishLevel(false), 450);
       }
@@ -976,6 +1565,7 @@ LEVELS.push({
     pizzasCarried -= 1;
     const comboBonus = deliveryCombo > 1 ? deliveryCombo * 35 : 0;
     score += 200 + comboBonus + Math.ceil(timeLeft * 2);
+    saveCampaignScore();
     player.celebrate = 1;
     burst(target.x, target.y, "#ffd25d", 28);
     burst(target.x, target.y, "#65b86f", 16);
@@ -989,7 +1579,8 @@ LEVELS.push({
         updateHud();
         return;
       }
-      setTimeout(() => finishLevel(true), 520);
+      showToast("Objetivo listo. Sal por la derecha");
+      updateHud();
       return;
     }
 
@@ -1015,10 +1606,12 @@ LEVELS.push({
 
     const used = levelData.duration - Math.max(0, timeLeft);
     const stars = won
-      ? (hearts === 3 && timeLeft > levelData.duration * .35 ? 3 : hearts >= 2 ? 2 : 1)
+      ? (hearts === maxHearts() && timeLeft > levelData.duration * .35 ? 3 : hearts >= 2 ? 2 : 1)
       : 0;
 
     if (won) {
+      saveLevelProgress();
+      saveCampaignScore();
       const previous = Number(localStorage.getItem(`pizzaDashStars${activeLevel}`) || 0);
       localStorage.setItem(`pizzaDashStars${activeLevel}`, String(Math.max(previous, stars)));
       el.resultIcon.textContent = "🏆";
@@ -1037,7 +1630,7 @@ LEVELS.push({
         autoAdvanceTimer = setTimeout(() => {
           const nextUrl = LEVEL_URLS[activeLevel + 1];
           if (nextUrl) {
-            window.location.href = nextUrl;
+            travelTo(nextUrl);
             return;
           }
           beginLevel(activeLevel + 1);
@@ -1067,13 +1660,13 @@ LEVELS.push({
     const picnicProgress = world.picnicOrders.length
       ? ` · 🧺 ${world.picnicOrders.filter(order => order.collected).length}/${world.picnicOrders.length}`
       : "";
-    el.hudDeliveries.textContent = `${pizzasCarried}/${MAX_PIZZAS} · ${delivered}/${levelData.required}${picnicProgress}`;
+    el.hudDeliveries.textContent = `${pizzasCarried}/${maxPizzas()} · ${delivered}/${levelData.required}${picnicProgress}`;
     el.hudScore.textContent = String(score);
-    el.hudHearts.textContent = `${"♥ ".repeat(hearts)}${"♡ ".repeat(3 - hearts)}`.trim();
+    el.hudHearts.textContent = `${"♥ ".repeat(hearts)}${"♡ ".repeat(Math.max(0, maxHearts() - hearts))}`.trim();
     el.missionText.textContent = hasPendingPicnicOrders()
       ? `Misión: recoge pedidos de picnic (${world.picnicOrders.filter(order => order.collected).length}/${world.picnicOrders.length})`
       : delivered >= levelData.required
-        ? "¡Todas las pizzas y pedidos fueron entregados!"
+        ? "Objetivo listo: sal por la orilla derecha"
       : pizzasCarried <= 0
         ? "Vuelve a la pizzería para recargar"
       : rival
@@ -1183,7 +1776,10 @@ LEVELS.push({
 
   function drawBackground() {
     const gradient = ctx.createLinearGradient(0, 0, 0, H);
-    if (levelData.theme === "night") {
+    if (levelData.theme === "park") {
+      gradient.addColorStop(0, levelData.grass);
+      gradient.addColorStop(1, levelData.grass);
+    } else if (levelData.theme === "night") {
       gradient.addColorStop(0, "#273061");
       gradient.addColorStop(.25, "#384260");
       gradient.addColorStop(1, levelData.grass);
@@ -1196,12 +1792,12 @@ LEVELS.push({
     ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, W, H);
 
-    if (levelData.theme !== "night") {
+    if (levelData.theme !== "night" && levelData.theme !== "park") {
       ctx.fillStyle = "rgba(255,255,255,.5)";
       drawCloud(120, 64, .8);
       drawCloud(1000, 75, 1.1);
       drawCloud(650, 48, .65);
-    } else {
+    } else if (levelData.theme === "night") {
       ctx.fillStyle = "#fff2b2";
       ctx.beginPath();
       ctx.arc(1070, 92, 38, 0, Math.PI * 2);
@@ -1251,8 +1847,8 @@ LEVELS.push({
         ctx.moveTo(0, road.y + road.h / 2);
         ctx.lineTo(W, road.y + road.h / 2);
       } else {
-        ctx.moveTo(road.x + road.w / 2, 0);
-        ctx.lineTo(road.x + road.w / 2, H);
+        ctx.moveTo(road.x + road.w / 2, road.y);
+        ctx.lineTo(road.x + road.w / 2, road.y + road.h);
       }
       ctx.stroke();
       ctx.setLineDash([]);
@@ -1261,7 +1857,7 @@ LEVELS.push({
       if (road.axis === "x") {
         for (let x = 20; x < W; x += 72) ctx.fillRect(x, road.y + 12, 35, 3);
       } else {
-        for (let y = 20; y < H; y += 72) ctx.fillRect(road.x + 12, y, 3, 35);
+        for (let y = road.y + 20; y < road.y + road.h; y += 72) ctx.fillRect(road.x + 12, y, 3, 35);
       }
     }
 
@@ -1291,28 +1887,28 @@ LEVELS.push({
     if (levelData.theme === "park") {
       ctx.fillStyle = "#d8c595";
       ctx.beginPath();
-      ctx.ellipse(640, 245, 180, 110, 0, 0, Math.PI * 2);
+      ctx.ellipse(830, 258, 116, 72, 0, 0, Math.PI * 2);
       ctx.fill();
       ctx.fillStyle = "#73bcd0";
       ctx.beginPath();
-      ctx.ellipse(640, 245, 118, 67, 0, 0, Math.PI * 2);
+      ctx.ellipse(830, 258, 76, 40, 0, 0, Math.PI * 2);
       ctx.fill();
       ctx.strokeStyle = "rgba(255,255,255,.45)";
       ctx.lineWidth = 4;
       ctx.beginPath();
-      ctx.ellipse(640, 245, 95, 50, 0, 0, Math.PI * 2);
+      ctx.ellipse(830, 258, 58, 29, 0, 0, Math.PI * 2);
       ctx.stroke();
 
       ctx.strokeStyle = "rgba(255,255,255,.5)";
       ctx.lineWidth = 3;
       ctx.beginPath();
-      ctx.arc(640, 245, 42 + Math.sin(animationClock * 1.8) * 4, 0, Math.PI * 2);
+      ctx.arc(830, 258, 24 + Math.sin(animationClock * 1.8) * 3, 0, Math.PI * 2);
       ctx.stroke();
-      fillRoundedRect(ctx, 548, 118, 184, 52, 18, "rgba(68,145,90,.8)");
+      fillRoundedRect(ctx, 738, 132, 184, 52, 18, "rgba(68,145,90,.8)");
       ctx.fillStyle = "#fff7d7";
       ctx.font = "900 18px Trebuchet MS";
       ctx.textAlign = "center";
-      ctx.fillText("PARQUE", 640, 150);
+      ctx.fillText("PARQUE", 830, 164);
 
       drawLamp(470, 465);
       drawLamp(810, 465);
@@ -1392,7 +1988,7 @@ LEVELS.push({
     const y = PIZZERIA.y;
     ctx.save();
     ctx.translate(x, y);
-    if (state === "playing" && pizzasCarried < MAX_PIZZAS) {
+    if (state === "playing" && pizzasCarried < maxPizzas()) {
       ctx.save();
       ctx.translate(PIZZERIA.refillX - x, PIZZERIA.refillY - y);
       const pulse = 1 + Math.sin(animationClock * 6) * .08;
@@ -1410,21 +2006,24 @@ LEVELS.push({
       ctx.setLineDash([]);
       ctx.restore();
     }
-    ctx.fillStyle = "rgba(61,34,39,.16)";
-    fillRoundedRect(ctx, 8, 18, 208, 128, 16, "rgba(61,34,39,.18)");
-    fillRoundedRect(ctx, 0, 0, 205, 122, 14, levelData.theme === "night" ? "#4e4159" : "#f4d49e");
+    fillRoundedRect(ctx, 5, 12, PIZZERIA.w, PIZZERIA.h + 8, 10, "rgba(61,34,39,.16)");
+    fillRoundedRect(ctx, 0, 0, PIZZERIA.w, PIZZERIA.h, 9, levelData.theme === "night" ? "#4e4159" : "#f4d49e");
     ctx.fillStyle = "#d85045";
     ctx.beginPath();
-    ctx.moveTo(-10, 18);
-    ctx.lineTo(102, -34);
-    ctx.lineTo(215, 18);
+    ctx.moveTo(-8, 12);
+    ctx.lineTo(PIZZERIA.w / 2, -24);
+    ctx.lineTo(PIZZERIA.w + 8, 12);
     ctx.closePath();
     ctx.fill();
-    fillRoundedRect(ctx, 48, 55, 110, 42, 8, "#6c2e2e");
+    ctx.fillStyle = "rgba(122,61,38,.18)";
+    for (let tx = 9; tx < PIZZERIA.w - 12; tx += 28) {
+      ctx.fillRect(tx, 13, 18, 5);
+    }
+    fillRoundedRect(ctx, 30, 24, 72, 22, 6, "#6c2e2e");
     ctx.fillStyle = "#ffd65a";
-    ctx.font = "900 24px Nunito";
+    ctx.font = "900 15px Nunito";
     ctx.textAlign = "center";
-    ctx.fillText("PIZZA", 103, 84);
+    ctx.fillText("PIZZA", PIZZERIA.w / 2, 40);
     ctx.restore();
   }
 
@@ -1745,12 +2344,11 @@ LEVELS.push({
 
   function drawCar(car) {
     ctx.save();
-    ctx.translate(car.x + car.w / 2, car.y + car.h / 2);
-    const vertical = car.h > car.w;
-    if (vertical) ctx.rotate(Math.PI / 2);
+    ctx.translate(car.cx, car.cy);
+    ctx.rotate(car.heading);
 
-    const w = vertical ? car.h : car.w;
-    const h = vertical ? car.w : car.h;
+    const w = 92;
+    const h = 48;
 
     ctx.fillStyle = "rgba(41,29,38,.18)";
     fillRoundedRect(ctx, -w / 2 + 5, -h / 2 + 8, w, h, 15, "rgba(41,29,38,.18)");
@@ -2086,6 +2684,7 @@ LEVELS.push({
     const dt = Math.min((now - previousTime) / 1000, .035);
     previousTime = now;
     update(dt);
+    updateResponsiveCamera(dt);
     draw();
     requestAnimationFrame(loop);
   }
@@ -2115,8 +2714,14 @@ LEVELS.push({
 
   el.soundBtn.addEventListener("click", () => {
     audioEnabled = !audioEnabled;
-    el.soundBtn.textContent = audioEnabled ? "🔊" : "🔇";
+    updateSoundButtonState();
     if (audioEnabled) sound("click");
+  });
+
+  document.querySelectorAll(".mobile-controls, .mobile-controls button, .topbar-actions button, .control-icon").forEach(node => {
+    ["contextmenu", "selectstart", "dragstart"].forEach(type => {
+      node.addEventListener(type, event => event.preventDefault());
+    });
   });
 
   document.querySelectorAll(".level-card").forEach(card => {
@@ -2144,6 +2749,7 @@ LEVELS.push({
   window.addEventListener("keyup", event => keys.delete(event.code));
   window.addEventListener("blur", () => {
     keys.clear();
+    clearMobileSprint();
     if (state === "playing") togglePause();
   });
 
@@ -2151,6 +2757,21 @@ LEVELS.push({
     const code = button.dataset.key;
     const press = event => {
       event.preventDefault();
+      const now = performance.now();
+      const doubleTapped = !mobileSprintActive &&
+        code === lastMobileDirectionCode &&
+        now - lastMobileDirectionTapAt < 330;
+
+      if (doubleTapped) {
+        setMobileSprintActive(true);
+        lastMobileDirectionTapAt = 0;
+        lastMobileDirectionCode = "";
+      } else {
+        if (mobileSprintActive) setMobileSprintActive(false);
+        lastMobileDirectionTapAt = now;
+        lastMobileDirectionCode = code;
+      }
+
       keys.add(code);
       getAudioContext();
     };
@@ -2172,6 +2793,7 @@ LEVELS.push({
   levelData = LEVELS[1];
   world = createDecorativeWorld();
   refreshLevelStars();
+  updateSoundButtonState();
   beginLevel(1);
   requestAnimationFrame(loop);
 })();

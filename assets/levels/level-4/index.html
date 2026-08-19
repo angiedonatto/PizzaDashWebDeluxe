@@ -4,34 +4,319 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="theme-color" content="#16111f" />
-  <title>Pizza Dash — Nivel 4</title>
-  <link rel="stylesheet" href="../../../styles.css" />
+  <title>Pizza Dash — Aventura de reparto</title>
+  <link rel="stylesheet" href="../../../styles.css?v=industrial-preview-1" />
   <link rel="stylesheet" href="level.css" />
 </head>
 <body>
   <main class="page-shell">
-    <section class="game-frame" aria-label="Pizza Dash Nivel 4">
+    <section class="game-frame" aria-label="Pizza Dash">
+      <div class="frame-glow"></div>
+
       <header class="game-topbar">
         <div class="mini-brand">
           <span class="mini-brand__slice">🍕</span>
           <span>Pizza Dash</span>
         </div>
+        <div class="topbar-actions">
+          <button id="soundBtn" class="icon-button" type="button" aria-label="Activar o desactivar sonido">
+            <svg class="control-icon control-icon--sound" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+              <path class="sound-speaker" d="M3 9v6h4l5 4V5L7 9H3Z"></path>
+              <path class="sound-wave" d="M15 9.5c1.2 1.4 1.2 3.6 0 5M18 7c2.4 2.8 2.4 7.2 0 10"></path>
+              <path class="sound-muted" d="M4 4l16 16"></path>
+            </svg>
+          </button>
+          <button id="pauseBtn" class="icon-button hidden" type="button" aria-label="Pausar">
+            <svg class="control-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+              <rect x="6" y="5" width="4.5" height="14" rx="1.5"></rect>
+              <rect x="13.5" y="5" width="4.5" height="14" rx="1.5"></rect>
+            </svg>
+          </button>
+        </div>
       </header>
+
       <div class="canvas-wrap">
-        <section class="overlay-screen">
-          <div class="panel result-panel">
-            <span class="result-icon">🍕</span>
-            <span class="eyebrow">NIVEL RESERVADO</span>
-            <h2>Nivel 4</h2>
-            <p>Carpeta preparada para trabajo futuro sin modificar la jugabilidad actual.</p>
-            <div class="result-actions">
-              <a class="secondary-button" href="../../../index.html">MENÚ</a>
+        <canvas id="gameCanvas" width="1280" height="720" aria-label="Juego Pizza Dash"></canvas>
+
+        <section id="hud" class="hud hidden" aria-live="polite">
+          <div class="hud-group">
+            <div class="hud-pill hud-pill--level">
+              <span class="hud-label">NIVEL</span>
+              <strong id="hudLevel">1</strong>
+            </div>
+            <div class="hud-pill">
+              <span class="hud-icon">⏱</span>
+              <strong id="hudTime">01:30</strong>
+            </div>
+          </div>
+
+          <div class="hud-center">
+            <div class="mission-card">
+              <span id="missionText">Entrega la pizza</span>
+              <div class="mission-progress">
+                <span id="missionProgress"></span>
+              </div>
+            </div>
+          </div>
+
+          <div class="hud-group hud-group--right">
+            <div class="hud-pill">
+              <span class="hud-icon">🍕</span>
+              <strong id="hudDeliveries">0/3</strong>
+            </div>
+            <div class="hud-pill">
+              <span class="hud-icon">🪙</span>
+              <strong id="hudScore">0</strong>
+            </div>
+            <div class="hud-pill hud-pill--hearts" id="hudHearts" aria-label="Vidas">♥ ♥ ♥</div>
+          </div>
+        </section>
+
+        <section id="menuScreen" class="overlay-screen overlay-screen--menu">
+          <div class="menu-hero">
+            <div class="eyebrow">UNA AVENTURA SABROSA</div>
+            <h1 class="logo-title">
+              <span class="logo-title__pizza">PIZZA</span>
+              <span class="logo-title__dash">DASH!</span>
+            </h1>
+            <p class="menu-copy">
+              Reparte pizzas calientes, esquiva el tráfico y conviértete en la leyenda del barrio.
+            </p>
+            <div class="menu-actions">
+              <button id="playBtn" class="primary-button" type="button">
+                <span class="button-icon">▶</span>
+                JUGAR
+              </button>
+              <button id="howBtn" class="secondary-button" type="button">CÓMO JUGAR</button>
+            </div>
+            <div class="controls-hint">
+              <span><kbd>WASD</kbd> o <kbd>↑↓←→</kbd> mover</span>
+              <span><kbd>E</kbd> o <kbd>ESPACIO</kbd> entregar</span>
+              <span><kbd>SHIFT</kbd> correr</span>
+            </div>
+          </div>
+
+          <div class="menu-character" aria-hidden="true">
+            <div class="character-sun"></div>
+            <div class="character-card">
+              <div class="character-art">
+                <div class="chef-hat">
+                  <span></span><span></span><span></span>
+                </div>
+                <div class="chef-head">
+                  <div class="chef-hair"></div>
+                  <div class="chef-eye chef-eye--left"></div>
+                  <div class="chef-eye chef-eye--right"></div>
+                  <div class="chef-smile"></div>
+                </div>
+                <div class="chef-body">
+                  <div class="chef-scarf"></div>
+                  <div class="pizza-box-art">
+                    <span>PIZZA</span>
+                  </div>
+                </div>
+              </div>
+              <div class="character-shadow"></div>
             </div>
           </div>
         </section>
+
+        <section id="levelScreen" class="overlay-screen hidden">
+          <div class="panel panel--wide">
+            <div class="panel-heading">
+              <div>
+                <span class="eyebrow">ELIGE TU RUTA</span>
+                <h2>Selecciona un nivel</h2>
+              </div>
+              <button id="backToMenuBtn" class="icon-button icon-button--light" type="button" aria-label="Volver">←</button>
+            </div>
+
+            <div class="level-grid">
+              <button class="level-card level-card--one" data-level="0" data-url="../level-1/" type="button">
+                <span class="level-number">01</span>
+                <span class="level-scene">
+                  <span class="scene-house scene-house--a"></span>
+                  <span class="scene-house scene-house--b"></span>
+                  <span class="scene-road"></span>
+                  <span class="scene-tree scene-tree--a"></span>
+                  <span class="scene-tree scene-tree--b"></span>
+                </span>
+                <span class="level-info">
+                  <strong>Barrio Soleado</strong>
+                  <small>3 entregas · Tráfico suave</small>
+                </span>
+                <span class="level-stars" id="stars-0">☆ ☆ ☆</span>
+              </button>
+
+              <button class="level-card level-card--two" data-level="1" data-url="../level-2/" type="button">
+                <span class="level-number">02</span>
+                <span class="level-scene">
+                  <span class="scene-park"></span>
+                  <span class="scene-pond"></span>
+                  <span class="scene-tree scene-tree--c"></span>
+                  <span class="scene-tree scene-tree--d"></span>
+                </span>
+                <span class="level-info">
+                  <strong>Parque Central</strong>
+                  <small>4 entregas · Charcos y gatos</small>
+                </span>
+                <span class="level-stars" id="stars-1">☆ ☆ ☆</span>
+              </button>
+
+              <button class="level-card level-card--three" data-level="2" data-url="../level-3/" type="button">
+                <span class="level-number">03</span>
+                <span class="level-scene">
+                  <span class="scene-night-road"></span>
+                  <span class="scene-neon scene-neon--a">PIZZA</span>
+                  <span class="scene-neon scene-neon--b">PIZZA</span>
+                  <span class="scene-rain"></span>
+                </span>
+                <span class="level-info">
+                  <strong>Ciudad Nocturna</strong>
+                  <small>5 entregas · Lluvia y tráfico</small>
+                </span>
+                <span class="level-stars" id="stars-2">☆ ☆ ☆</span>
+              </button>
+
+              <button class="level-card level-card--four" data-level="3" data-url="../level-4/" type="button">
+                <span class="level-number">04</span>
+                <span class="level-scene">
+                  <span class="scene-industrial-sun"></span>
+                  <span class="scene-industrial-building scene-industrial-building--a"></span>
+                  <span class="scene-industrial-building scene-industrial-building--b"></span>
+                  <span class="scene-industrial-road scene-industrial-road--a"></span>
+                  <span class="scene-industrial-road scene-industrial-road--b"></span>
+                  <span class="scene-industrial-road scene-industrial-road--c"></span>
+                </span>
+                <span class="level-info">
+                  <strong>Zona Industrial</strong>
+                  <small>6 entregas · 55 segundos</small>
+                </span>
+                <span class="level-stars" id="stars-3">☆ ☆ ☆</span>
+              </button>
+
+            </div>
+          </div>
+        </section>
+
+        <section id="howScreen" class="overlay-screen hidden">
+          <div class="panel how-panel">
+            <div class="panel-heading">
+              <div>
+                <span class="eyebrow">APRENDE EN 20 SEGUNDOS</span>
+                <h2>Cómo jugar</h2>
+              </div>
+              <button id="closeHowBtn" class="icon-button icon-button--light" type="button" aria-label="Cerrar">×</button>
+            </div>
+
+            <div class="how-grid">
+              <article class="how-item">
+                <span class="how-number">1</span>
+                <div class="how-illustration how-illustration--move">↕ ↔</div>
+                <h3>Muévete</h3>
+                <p>Usa WASD o las flechas para recorrer el mapa.</p>
+              </article>
+              <article class="how-item">
+                <span class="how-number">2</span>
+                <div class="how-illustration how-illustration--target">⌖</div>
+                <h3>Sigue el marcador</h3>
+                <p>La casa activa tiene una señal amarilla que rebota.</p>
+              </article>
+              <article class="how-item">
+                <span class="how-number">3</span>
+                <div class="how-illustration how-illustration--deliver">🍕</div>
+                <h3>Entrega</h3>
+                <p>Acércate a la puerta y presiona E o Espacio.</p>
+              </article>
+              <article class="how-item">
+                <span class="how-number">4</span>
+                <div class="how-illustration how-illustration--avoid">!</div>
+                <h3>Evita choques</h3>
+                <p>Los carros quitan una vida y algunos segundos.</p>
+              </article>
+            </div>
+
+            <button id="howPlayBtn" class="primary-button primary-button--small" type="button">ENTENDIDO</button>
+          </div>
+        </section>
+
+        <section id="pauseScreen" class="overlay-screen hidden">
+          <div class="panel result-panel">
+            <span class="result-icon">Ⅱ</span>
+            <h2>Juego pausado</h2>
+            <p>Respira. La pizza seguirá caliente.</p>
+            <div class="result-actions">
+              <button id="resumeBtn" class="primary-button primary-button--small" type="button">CONTINUAR</button>
+              <button id="pauseMenuBtn" class="secondary-button" type="button">MENÚ</button>
+            </div>
+          </div>
+        </section>
+
+        <section id="resultScreen" class="overlay-screen hidden">
+          <div class="panel result-panel">
+            <span id="resultIcon" class="result-icon">🏆</span>
+            <span id="resultEyebrow" class="eyebrow">MISIÓN COMPLETA</span>
+            <h2 id="resultTitle">¡Entrega perfecta!</h2>
+            <p id="resultMessage">El barrio ya tiene la cena lista.</p>
+
+            <div class="result-stars" id="resultStars">★ ★ ★</div>
+
+            <div class="result-stats">
+              <div>
+                <span>Tiempo</span>
+                <strong id="resultTime">01:02</strong>
+              </div>
+              <div>
+                <span>Puntaje</span>
+                <strong id="resultScore">850</strong>
+              </div>
+              <div>
+                <span>Entregas</span>
+                <strong id="resultDeliveries">3/3</strong>
+              </div>
+            </div>
+
+            <div class="result-actions">
+              <button id="nextBtn" class="primary-button primary-button--small" type="button">SIGUIENTE NIVEL</button>
+              <button id="retryBtn" class="secondary-button" type="button">REPETIR</button>
+              <button id="resultMenuBtn" class="secondary-button" type="button">MENÚ</button>
+            </div>
+          </div>
+        </section>
+
+        <div id="toast" class="toast hidden">¡Pizza entregada!</div>
+
+        <div class="mobile-controls" id="mobileControls">
+          <div class="dpad">
+            <button data-key="ArrowUp" class="dpad-up" aria-label="Arriba">
+              <svg class="control-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 6 5 17h14L12 6Z"></path></svg>
+            </button>
+            <button data-key="ArrowLeft" class="dpad-left" aria-label="Izquierda">
+              <svg class="control-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 12 17 5v14L6 12Z"></path></svg>
+            </button>
+            <button data-key="ArrowDown" class="dpad-down" aria-label="Abajo">
+              <svg class="control-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 18 5 7h14l-7 11Z"></path></svg>
+            </button>
+            <button data-key="ArrowRight" class="dpad-right" aria-label="Derecha">
+              <svg class="control-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m18 12-11 7V5l11 7Z"></path></svg>
+            </button>
+          </div>
+          <button id="mobileAction" class="mobile-action" aria-label="Entregar pizza">
+            <svg class="control-icon control-icon--box" viewBox="0 0 32 32" aria-hidden="true" focusable="false">
+              <path d="M6 9.5 16 5l10 4.5v14L16 28 6 23.5v-14Z"></path>
+              <path d="M6 9.5 16 14l10-4.5M16 14v14"></path>
+              <path d="M11 18h10M11 22h10"></path>
+            </svg>
+          </button>
+        </div>
       </div>
     </section>
+
+    <p class="page-note">
+      No requiere npm. Usa <strong>python3 -m http.server</strong> o Live Server.
+    </p>
   </main>
-  <script src="game.js"></script>
+
+  <script type="module" src="game.js?v=cat-pizza-2"></script>
 </body>
 </html>

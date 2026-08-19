@@ -293,6 +293,8 @@ LEVELS.push({
     const benches = [];
     const puddles = [];
     const cats = [];
+    const cyclists = [];
+    const picnicOrders = [];
 
     const treeSpots = theme === "park"
       ? [
@@ -319,6 +321,15 @@ LEVELS.push({
       puddles.push({ x: 790, y: 420, rx: 46, ry: 20 });
       cats.push(makeCat(420, 555, 72, "x"));
       cats.push(makeCat(820, 120, 66, "y"));
+      cyclists.push(
+        makeCyclist(305, 315, "x", 305, 970, 112, "#d94b55"),
+        makeCyclist(730, 220, "y", 220, 465, 96, "#347db7")
+      );
+      picnicOrders.push(
+        { x: 455, y: 320, collected: false, phase: rand(0, Math.PI * 2) },
+        { x: 790, y: 315, collected: false, phase: rand(0, Math.PI * 2) },
+        { x: 1080, y: 290, collected: false, phase: rand(0, Math.PI * 2) }
+      );
     } else {
       puddles.push({ x: 815, y: 455, rx: 42, ry: 17 });
       cats.push(makeCat(330, 448, 58, "x"));
@@ -354,7 +365,7 @@ LEVELS.push({
 
     const crosswalks = createCrosswalks(roads);
 
-    return { roads, houses, obstacles, trees, benches, puddles, cats, cars, coins, flowerSeed, crosswalks, lightning: [] };
+    return { roads, houses, obstacles, trees, benches, puddles, cats, cyclists, picnicOrders, cars, coins, flowerSeed, crosswalks, lightning: [] };
   }
 
   function makeHouse(x, y, w, h, wall, roof, doorX, doorY) {
@@ -446,6 +457,14 @@ LEVELS.push({
     };
   }
 
+  function makeCyclist(x, y, axis, min, max, speed, color) {
+    return {
+      x, y, axis, min, max, speed, color,
+      dir: Math.random() > .5 ? 1 : -1,
+      phase: rand(0, Math.PI * 2)
+    };
+  }
+
   function beginLevel(index) {
     clearTimeout(autoAdvanceTimer);
     activeLevel = index;
@@ -483,7 +502,9 @@ LEVELS.push({
     el.hud.classList.remove("hidden");
     el.pauseBtn.classList.remove("hidden");
     updateHud();
-    showToast(`Nivel ${index + 1}: ${levelData.name}`);
+    showToast(index === 1
+      ? "Parque Central: recoge los pedidos de picnic"
+      : `Nivel ${index + 1}: ${levelData.name}`);
     sound("click");
   }
 
@@ -662,7 +683,9 @@ LEVELS.push({
 
     updateCars(dt);
     updateCats(dt);
+    updateCyclists(dt);
     updateCoins();
+    updatePicnicOrders();
     updatePizzeriaRefill();
     updateRival(dt);
     updateLightning(dt);
@@ -727,6 +750,35 @@ LEVELS.push({
     }
   }
 
+  function updateCyclists(dt) {
+    for (const cyclist of world.cyclists) {
+      if (cyclist.axis === "x") {
+        cyclist.x += cyclist.dir * cyclist.speed * dt;
+        if (cyclist.x < cyclist.min || cyclist.x > cyclist.max) {
+          cyclist.x = clamp(cyclist.x, cyclist.min, cyclist.max);
+          cyclist.dir *= -1;
+        }
+      } else {
+        cyclist.y += cyclist.dir * cyclist.speed * dt;
+        if (cyclist.y < cyclist.min || cyclist.y > cyclist.max) {
+          cyclist.y = clamp(cyclist.y, cyclist.min, cyclist.max);
+          cyclist.dir *= -1;
+        }
+      }
+      cyclist.phase += dt * 8;
+
+      if (invulnerable <= 0 && Math.hypot(player.x - cyclist.x, player.y - cyclist.y) < player.r + 17) {
+        invulnerable = .7;
+        player.bump = 1;
+        timeLeft = Math.max(0, timeLeft - 2);
+        burst(player.x, player.y, "#d8eff7", 8);
+        spawnText(player.x, player.y - 30, "-2 s", "#347db7");
+        showToast("¡Un ciclista te retrasó!");
+        sound("crash");
+      }
+    }
+  }
+
   function hitPlayer(car) {
     hearts -= 1;
     timeLeft = Math.max(0, timeLeft - 4);
@@ -753,6 +805,29 @@ LEVELS.push({
         sound("coin");
       }
     }
+  }
+
+  function updatePicnicOrders() {
+    let collectedAny = false;
+    for (const order of world.picnicOrders) {
+      if (!order.collected && Math.hypot(player.x - order.x, player.y - order.y) < player.r + 18) {
+        order.collected = true;
+        collectedAny = true;
+        score += 75;
+        burst(order.x, order.y, "#f3c45b", 14);
+        spawnText(order.x, order.y - 30, "PEDIDO +75", "#3e9b5f");
+        showToast("Pedido de picnic recogido");
+        sound("coin");
+      }
+    }
+
+    if (collectedAny && !hasPendingPicnicOrders() && delivered >= levelData.required) {
+      setTimeout(() => finishLevel(true), 520);
+    }
+  }
+
+  function hasPendingPicnicOrders() {
+    return world.picnicOrders.some(order => !order.collected);
   }
 
   function updatePizzeriaRefill() {
@@ -875,6 +950,11 @@ LEVELS.push({
     sound("deliver");
 
     if (delivered >= levelData.required) {
+      if (hasPendingPicnicOrders()) {
+        showToast("Completa los pedidos de picnic para terminar");
+        updateHud();
+        return;
+      }
       setTimeout(() => finishLevel(true), 520);
       return;
     }
@@ -950,11 +1030,16 @@ LEVELS.push({
   function updateHud() {
     el.hudLevel.textContent = String(activeLevel + 1);
     el.hudTime.textContent = formatTime(timeLeft);
-    el.hudDeliveries.textContent = `${pizzasCarried}/${MAX_PIZZAS} · ${delivered}/${levelData.required}`;
+    const picnicProgress = world.picnicOrders.length
+      ? ` · 🧺 ${world.picnicOrders.filter(order => order.collected).length}/${world.picnicOrders.length}`
+      : "";
+    el.hudDeliveries.textContent = `${pizzasCarried}/${MAX_PIZZAS} · ${delivered}/${levelData.required}${picnicProgress}`;
     el.hudScore.textContent = String(score);
     el.hudHearts.textContent = `${"♥ ".repeat(hearts)}${"♡ ".repeat(3 - hearts)}`.trim();
-    el.missionText.textContent = delivered >= levelData.required
-      ? "¡Todas las pizzas fueron entregadas!"
+    el.missionText.textContent = hasPendingPicnicOrders()
+      ? `Misión: recoge pedidos de picnic (${world.picnicOrders.filter(order => order.collected).length}/${world.picnicOrders.length})`
+      : delivered >= levelData.required
+        ? "¡Todas las pizzas y pedidos fueron entregados!"
       : pizzasCarried <= 0
         ? "Vuelve a la pizzería para recargar"
       : rival
@@ -1025,9 +1110,11 @@ LEVELS.push({
       drawTrees();
       drawBenches();
       drawCoins();
+      drawPicnicOrders();
       drawTarget();
       drawLightning();
       drawCats();
+      drawCyclists();
       drawCars();
     }
     if (rival) drawRival();
@@ -1457,6 +1544,39 @@ LEVELS.push({
     }
   }
 
+  function drawPicnicOrders() {
+    for (const order of world.picnicOrders) {
+      if (order.collected) continue;
+      const bob = Math.sin(animationClock * 4 + order.phase) * 5;
+      const pulse = 1 + Math.sin(animationClock * 5 + order.phase) * .08;
+      ctx.save();
+      ctx.translate(order.x, order.y + bob);
+      ctx.scale(pulse, pulse);
+
+      const glow = ctx.createRadialGradient(0, 0, 4, 0, 0, 34);
+      glow.addColorStop(0, "rgba(255,234,124,.48)");
+      glow.addColorStop(1, "rgba(255,234,124,0)");
+      ctx.fillStyle = glow;
+      ctx.beginPath();
+      ctx.arc(0, 0, 34, 0, Math.PI * 2);
+      ctx.fill();
+
+      fillRoundedRect(ctx, -16, -12, 32, 25, 5, "#e7a65b");
+      ctx.strokeStyle = "#7b4931";
+      ctx.lineWidth = 3;
+      roundedRectPath(ctx, -16, -12, 32, 25, 5);
+      ctx.stroke();
+      ctx.fillStyle = "#d95545";
+      ctx.fillRect(-16, -3, 32, 6);
+      ctx.fillStyle = "#fff5c7";
+      ctx.font = "900 12px Nunito";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText("PICNIC", 0, 1);
+      ctx.restore();
+    }
+  }
+
   function drawTarget() {
     if (state !== "playing" || delivered >= levelData.required) return;
     const house = world.houses[currentTarget];
@@ -1667,6 +1787,55 @@ LEVELS.push({
       ctx.beginPath();
       ctx.arc(-13, -2, 12, Math.PI * .6, Math.PI * 1.6);
       ctx.stroke();
+      ctx.restore();
+    }
+  }
+
+  function drawCyclists() {
+    for (const cyclist of world.cyclists) {
+      const vertical = cyclist.axis === "y";
+      const direction = cyclist.dir < 0 ? -1 : 1;
+      const pedal = Math.sin(cyclist.phase) * 3;
+      ctx.save();
+      ctx.translate(cyclist.x, cyclist.y);
+      if (vertical) ctx.rotate(Math.PI / 2);
+      ctx.scale(direction, 1);
+
+      ctx.fillStyle = "rgba(40,33,45,.2)";
+      ctx.beginPath();
+      ctx.ellipse(0, 15, 24, 6, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.strokeStyle = "#334054";
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.arc(-13, 9, 8, 0, Math.PI * 2);
+      ctx.arc(14, 9, 8, 0, Math.PI * 2);
+      ctx.moveTo(-13, 9);
+      ctx.lineTo(-2, 0);
+      ctx.lineTo(14, 9);
+      ctx.lineTo(3, 9);
+      ctx.lineTo(-2, 0);
+      ctx.lineTo(7, -1);
+      ctx.stroke();
+
+      ctx.strokeStyle = "#bf794d";
+      ctx.lineWidth = 5;
+      ctx.beginPath();
+      ctx.moveTo(-2, -1);
+      ctx.lineTo(-7, -15 + pedal);
+      ctx.moveTo(1, -1);
+      ctx.lineTo(8, -13 - pedal);
+      ctx.stroke();
+      fillRoundedRect(ctx, -9, -29, 18, 19, 7, cyclist.color);
+      ctx.fillStyle = "#e2a477";
+      ctx.beginPath();
+      ctx.arc(0, -38, 8, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = cyclist.color;
+      ctx.beginPath();
+      ctx.arc(0, -42, 10, Math.PI, Math.PI * 2);
+      ctx.fill();
       ctx.restore();
     }
   }

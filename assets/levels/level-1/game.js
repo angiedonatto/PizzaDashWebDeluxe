@@ -512,10 +512,12 @@ LEVELS.push({
 
   function makeHouseObstacles(house) {
     const body = {
-      x: house.x + 16,
-      y: house.y + 24,
-      w: house.w - 32,
-      h: Math.max(48, house.h - 78),
+      // The whole rendered house sprite is solid: roof, walls, overhangs,
+      // and foundation. The extra margin prevents visual clipping at edges.
+      x: house.x - 24,
+      y: house.y - 48,
+      w: house.w + 48,
+      h: house.h + 72,
       type: "house"
     };
     const leftShrub = { x: house.x + 2, y: house.y + house.h - 24, w: 34, h: 30, type: "yard" };
@@ -534,12 +536,14 @@ LEVELS.push({
     let colorIndex = 0;
 
     for (const road of roads) {
+      // Keep traffic on the horizontal streets. Two deterministic lanes with
+      // 75px center separation leave enough room for the 48px car sprites.
       if (road.axis === "x") {
-        const laneGap = road.h / 4;
+        const laneCenters = [road.y + road.h * .25, road.y + road.h * .75];
         [-1, 1].forEach((direction, laneIndex) => {
           cars.push(makeCar(
-            direction > 0 ? -160 - laneIndex * 310 : W + 160 + laneIndex * 280,
-            road.y + laneGap * (laneIndex + 1) - 24,
+            direction > 0 ? -170 - laneIndex * 280 : W + 170 + laneIndex * 280,
+            laneCenters[laneIndex] - 24,
             92,
             48,
             direction,
@@ -549,27 +553,6 @@ LEVELS.push({
             { axis: "x", road }
           ));
         });
-        if (levelIndex >= 1) {
-          cars.push(makeCar(W + 520, road.y + laneGap * 3 - 24, 92, 48, -1, 0, colors[colorIndex++ % colors.length], levelData.traffic * multiplier * 1.06, { axis: "x", road }));
-        }
-      } else {
-        const laneGap = road.w / 4;
-        [-1, 1].forEach((direction, laneIndex) => {
-          cars.push(makeCar(
-            road.x + laneGap * (laneIndex + 1) - 24,
-            direction > 0 ? -170 - laneIndex * 260 : H + 170 + laneIndex * 300,
-            48,
-            92,
-            0,
-            direction,
-            colors[colorIndex++ % colors.length],
-            levelData.traffic * multiplier * (laneIndex ? .86 : .96),
-            { axis: "y", road }
-          ));
-        });
-        if (levelIndex === 2) {
-          cars.push(makeCar(road.x + laneGap * 3 - 24, H + 570, 48, 92, 0, -1, colors[colorIndex++ % colors.length], levelData.traffic * multiplier * 1.08, { axis: "y", road }));
-        }
       }
     }
 
@@ -670,16 +653,23 @@ LEVELS.push({
     const previousX = player.x;
     const previousY = player.y;
     player.x = clamp(player.x + dx, player.r + 8, W - player.r - 8);
-    resolvePlayerObstacles();
-
     const movedX = Math.abs(player.x - previousX) > .01;
     player.y = clamp(player.y + dy, player.r + 62, H - player.r - 8);
+    if (insideHouseFootprint(player.x, player.y)) {
+      player.x = previousX;
+      player.y = previousY;
+      return;
+    }
     resolvePlayerObstacles();
-
-    if (!movedX && Math.abs(dx) > .01 && Math.abs(dy) < .01 && Math.abs(player.y - previousY) < .01) {
-      player.y = clamp(previousY + Math.sign(dx) * 7, player.r + 62, H - player.r - 8);
+    // A second hard guard keeps the player's center out of the full house/roof
+    // footprint even if a large frame skips over the circle collision edge.
+    const insideHouse = insideHouseFootprint(player.x, player.y);
+    if (insideHouse) {
+      player.x = previousX;
+      player.y = previousY;
       resolvePlayerObstacles();
     }
+
   }
 
   function keepPlayerSafe() {
@@ -699,7 +689,14 @@ LEVELS.push({
   }
 
   function resolvePlayerObstacles() {
-    resolveCircleObstacles(player, 6);
+    resolveCircleObstacles(player, 12);
+  }
+
+  function insideHouseFootprint(x, y) {
+    return world.houses.some(house =>
+      x > house.x - 24 - player.r && x < house.x + house.w + 24 + player.r &&
+      y > house.y - 48 - player.r && y < house.y + house.h + 24 + player.r
+    );
   }
 
   function resolveCircleObstacles(circle, iterations) {
@@ -857,16 +854,49 @@ LEVELS.push({
         hitPlayer(car);
       }
     }
+    // Keep cars in the same lane separated, preventing visual overlap at speed.
+    for (let pass = 0; pass < 4; pass += 1) {
+      for (let i = 0; i < world.cars.length; i += 1) {
+        for (let j = i + 1; j < world.cars.length; j += 1) {
+        const a = world.cars[i]; const b = world.cars[j];
+        const horizontal = a.lane?.axis === "x" && b.lane?.axis === "x";
+        const vertical = a.lane?.axis === "y" && b.lane?.axis === "y";
+        if (!horizontal && !vertical) continue;
+        const laneDistance = horizontal
+          ? Math.abs((a.y + a.h / 2) - (b.y + b.h / 2))
+          : Math.abs((a.x + a.w / 2) - (b.x + b.w / 2));
+        const overlap = horizontal
+          ? Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x)
+          : Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y);
+        if (laneDistance < 38 && overlap > 0) {
+          const push = overlap + 3;
+          if (horizontal) {
+            const sign = Math.sign((a.x + a.w / 2) - (b.x + b.w / 2)) || 1;
+            a.x += sign * push;
+          } else {
+            const sign = Math.sign((a.y + a.h / 2) - (b.y + b.h / 2)) || 1;
+            a.y += sign * push;
+          }
+        }
+      }
+    }
+    }
   }
 
   function updateCats(dt) {
     for (const cat of world.cats) {
       if (cat.axis === "x") {
         cat.x += cat.dir * cat.speed * dt;
-        if (Math.abs(cat.x - cat.baseX) > cat.range) cat.dir *= -1;
+        if (Math.abs(cat.x - cat.baseX) >= cat.range) {
+          cat.x = cat.baseX + Math.sign(cat.x - cat.baseX) * cat.range;
+          cat.dir *= -1;
+        }
       } else {
         cat.y += cat.dir * cat.speed * dt;
-        if (Math.abs(cat.y - cat.baseY) > cat.range) cat.dir *= -1;
+        if (Math.abs(cat.y - cat.baseY) >= cat.range) {
+          cat.y = cat.baseY + Math.sign(cat.y - cat.baseY) * cat.range;
+          cat.dir *= -1;
+        }
       }
       cat.phase += dt * 6;
 
@@ -1655,7 +1685,11 @@ LEVELS.push({
   }
 
   function drawTarget() {
-    if (state !== "playing" || delivered >= levelData.required) return;
+    if (state !== "playing") return;
+    if (delivered >= levelData.required) {
+      drawExitPrompt();
+      return;
+    }
     const returningToPizzeria = pizzasCarried <= 0;
     const house = returningToPizzeria ? null : world.houses[currentTarget];
     const x = returningToPizzeria ? PIZZERIA.refillX : house.doorX;
@@ -1711,6 +1745,27 @@ LEVELS.push({
       ctx.textAlign = "center";
       ctx.fillText(returningToPizzeria ? "PIZZERÍA · COMPRAR PIZZAS" : "E / ESPACIO · ENTREGAR", x, targetY + 35);
     }
+  }
+
+  function drawExitPrompt() {
+    const road = world.roads.find(item => item.axis === "x" && item.x === 0);
+    if (!road) return;
+    const x = W - 82;
+    const y = road.y + road.h / 2;
+    ctx.save();
+    ctx.translate(x, y);
+    const pulse = 1 + Math.sin(animationClock * 5) * .08;
+    ctx.scale(pulse, pulse);
+    ctx.fillStyle = "rgba(255,208,77,.22)";
+    ctx.beginPath(); ctx.arc(0, 0, 46, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "#ffd04d";
+    ctx.font = "900 40px Nunito";
+    ctx.textAlign = "center";
+    ctx.fillText("➜", 0, 13);
+    ctx.fillStyle = "#fff7d7";
+    ctx.font = "900 13px Nunito";
+    ctx.fillText("SALIDA · NIVEL 2", -4, -34);
+    ctx.restore();
   }
 
   function drawPizzaSlice(x, y, scale) {

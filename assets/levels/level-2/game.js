@@ -288,7 +288,7 @@ LEVELS.push({
       });
     }
 
-    const obstacles = houses.flatMap(makeHouseObstacles);
+    const obstacles = houses.flatMap(house => makeHouseObstacles(house, theme === "park"));
     const trees = [];
     const benches = [];
     const puddles = [];
@@ -319,15 +319,15 @@ LEVELS.push({
       obstacles.push(...benches.map(b => ({ ...b, type: "bench" })));
       puddles.push({ x: 470, y: 420, rx: 55, ry: 23 });
       puddles.push({ x: 790, y: 420, rx: 46, ry: 20 });
-      cats.push(makeCat(420, 555, 72, "x"));
+      cats.push(makeCat(420, 455, 72, "x"));
       cats.push(makeCat(820, 120, 66, "y"));
       cyclists.push(
-        makeCyclist(305, 315, "x", 305, 970, 112, "#d94b55"),
-        makeCyclist(730, 220, "y", 220, 465, 96, "#347db7")
+        makeCyclist(305, 315, "x", 305, 495, 112, "#d94b55"),
+        makeCyclist(700, 220, "y", 220, 465, 96, "#347db7")
       );
       picnicOrders.push(
-        { x: 455, y: 320, collected: false, phase: rand(0, Math.PI * 2) },
-        { x: 790, y: 315, collected: false, phase: rand(0, Math.PI * 2) },
+        { x: 430, y: 410, collected: false, phase: rand(0, Math.PI * 2) },
+        { x: 835, y: 315, collected: false, phase: rand(0, Math.PI * 2) },
         { x: 1080, y: 290, collected: false, phase: rand(0, Math.PI * 2) }
       );
     } else {
@@ -372,12 +372,12 @@ LEVELS.push({
     return { x, y, w, h, wall, roof, doorX, doorY, night: false };
   }
 
-  function makeHouseObstacles(house) {
+  function makeHouseObstacles(house, blockRoof = false) {
     const body = {
-      x: house.x + 16,
-      y: house.y + 24,
-      w: house.w - 32,
-      h: Math.max(48, house.h - 78),
+      x: blockRoof ? house.x - 10 : house.x + 16,
+      y: blockRoof ? house.y - 30 : house.y + 24,
+      w: blockRoof ? house.w + 20 : house.w - 32,
+      h: Math.max(48, blockRoof ? house.h - 24 : house.h - 78),
       type: "house"
     };
     const leftShrub = { x: house.x + 2, y: house.y + house.h - 24, w: 34, h: 30, type: "yard" };
@@ -707,8 +707,12 @@ LEVELS.push({
 
   function updateCars(dt) {
     for (const car of world.cars) {
-      car.x += car.dx * car.speed * dt;
-      car.y += car.dy * car.speed * dt;
+      const nextX = car.x + car.dx * car.speed * dt;
+      const nextY = car.y + car.dy * car.speed * dt;
+      if (!shouldYieldAtIntersection(car, nextX, nextY)) {
+        car.x = nextX;
+        car.y = nextY;
+      }
       car.hornCooldown -= dt;
 
       if (car.lane?.axis === "x") {
@@ -722,11 +726,41 @@ LEVELS.push({
       if (car.dy > 0 && car.y > H + 140) car.y = -170 - rand(0, 220);
       if (car.dy < 0 && car.y < -170) car.y = H + 140 + rand(0, 220);
 
-      const hitbox = { x: car.x + 7, y: car.y + 7, w: car.w - 14, h: car.h - 14 };
+      const hitbox = getCarHitbox(car);
       if (invulnerable <= 0 && circleRectCollision(player, hitbox)) {
         hitPlayer(car);
       }
     }
+  }
+
+  function getCarHitbox(car, x = car.x, y = car.y) {
+    return { x: x + 7, y: y + 7, w: car.w - 14, h: car.h - 14 };
+  }
+
+  function shouldYieldAtIntersection(car, nextX, nextY) {
+    const horizontalRoad = world.roads.find(road => road.axis === "x");
+    const verticalRoad = world.roads.find(road => road.axis === "y");
+    if (!horizontalRoad || !verticalRoad || !car.lane) return false;
+
+    const intersection = {
+      x: verticalRoad.x,
+      y: horizontalRoad.y,
+      w: verticalRoad.w,
+      h: horizontalRoad.h
+    };
+    const currentBox = getCarHitbox(car);
+    const nextBox = getCarHitbox(car, nextX, nextY);
+    const enteringIntersection = !rectsOverlap(currentBox, intersection) && rectsOverlap(nextBox, intersection);
+    if (!enteringIntersection) return false;
+
+    const greenAxis = Math.floor(animationClock / 4) % 2 === 0 ? "x" : "y";
+    if (car.lane.axis !== greenAxis) return true;
+
+    return world.cars.some(other =>
+      other !== car &&
+      other.lane?.axis !== car.lane.axis &&
+      rectsOverlap(getCarHitbox(other), intersection)
+    );
   }
 
   function updateCats(dt) {
